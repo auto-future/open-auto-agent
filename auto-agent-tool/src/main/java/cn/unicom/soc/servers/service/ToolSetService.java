@@ -356,7 +356,7 @@ public class ToolSetService {
 
     /**
      * 批量上传 Skill 目录（zip 文件）
-     * zip 中每个一级子目录视为一个 skill，目录中需包含 skill.json 元数据文件
+     * zip 中每个一级子目录视为一个 skill，目录中需包含 SKILL.md 元数据文件
      */
     @Transactional
     public List<ToolDto> uploadSkillDirectories(String toolSetId, MultipartFile zipFile) throws IOException {
@@ -367,7 +367,6 @@ public class ToolSetService {
             throw new IllegalArgumentException("Only skills type toolset supports directory upload");
         }
 
-        ObjectMapper objectMapper = new ObjectMapper();
         List<ToolDto> result = new ArrayList<>();
 
         // 基础存储路径
@@ -397,33 +396,25 @@ public class ToolSetService {
                 List<Path> skillDirs = dirs.filter(Files::isDirectory).collect(Collectors.toList());
 
                 for (Path skillDir : skillDirs) {
-                    Path skillJsonPath = skillDir.resolve("skill.json");
-                    if (!Files.exists(skillJsonPath)) {
-                        continue; // 跳过没有 skill.json 的目录
+                    Path skillMdPath = skillDir.resolve("SKILL.md");
+                    if (!Files.exists(skillMdPath)) {
+                        continue; // 跳过没有 SKILL.md 的目录
                     }
 
-                    // 解析 skill.json
-                    String skillJsonContent = Files.readString(skillJsonPath, StandardCharsets.UTF_8);
-                    JsonNode skillNode = objectMapper.readTree(skillJsonContent);
+                    // 读取 SKILL.md 内容
+                    String skillMdContent = Files.readString(skillMdPath, StandardCharsets.UTF_8);
 
-                    String name = skillNode.has("name") ? skillNode.get("name").asText() : skillDir.getFileName().toString();
-                    String description = skillNode.has("description") ? skillNode.get("description").asText() : "";
-                    String inputSchema = skillNode.has("inputSchema") ? skillNode.get("inputSchema").toString() : "{}";
-                    String entryFile = skillNode.has("entry") ? skillNode.get("entry").asText() : "";
+                    // 解析 YAML frontmatter
+                    SkillMetadata metadata = parseSkillMetadata(skillMdContent);
+
+                    String name = metadata.name != null && !metadata.name.isBlank()
+                            ? metadata.name : skillDir.getFileName().toString();
+                    String description = metadata.description != null ? metadata.description : "";
 
                     // 生成 skill ID 并复制到最终目录
                     String skillId = UUID.randomUUID().toString();
                     Path targetDir = basePath.resolve(skillId);
                     copyDirectory(skillDir, targetDir);
-
-                    // 读取入口脚本内容
-                    String scriptContent = "";
-                    if (!entryFile.isEmpty()) {
-                        Path entryPath = targetDir.resolve(entryFile);
-                        if (Files.exists(entryPath)) {
-                            scriptContent = Files.readString(entryPath, StandardCharsets.UTF_8);
-                        }
-                    }
 
                     // 创建 ToolEntity
                     ToolEntity toolEntity = new ToolEntity();
@@ -431,9 +422,9 @@ public class ToolSetService {
                     toolEntity.setDescription(description);
                     toolEntity.setToolSetId(toolSetId);
                     toolEntity.setType("skills");
-                    toolEntity.setInputSchema(inputSchema);
+                    toolEntity.setInputSchema("{}");
                     toolEntity.setResourcePath(targetDir.toString());
-                    toolEntity.setScriptContent(scriptContent);
+                    toolEntity.setScriptContent(skillMdContent);
                     toolEntity.setStatus(1);
 
                     ToolEntity savedTool = toolRepository.save(toolEntity);
@@ -446,6 +437,47 @@ public class ToolSetService {
         }
 
         return result;
+    }
+
+    /**
+     * 解析 SKILL.md 的 YAML frontmatter
+     */
+    private SkillMetadata parseSkillMetadata(String markdownContent) {
+        SkillMetadata metadata = new SkillMetadata();
+        String content = markdownContent.trim();
+
+        // 检查是否以 --- 开头
+        if (!content.startsWith("---")) {
+            return metadata;
+        }
+
+        // 找到第二个 ---
+        int endIndex = content.indexOf("---", 3);
+        if (endIndex == -1) {
+            return metadata;
+        }
+
+        String yamlContent = content.substring(3, endIndex).trim();
+        String[] lines = yamlContent.split("\n");
+
+        for (String line : lines) {
+            line = line.trim();
+            if (line.startsWith("name:")) {
+                metadata.name = line.substring(5).trim();
+            } else if (line.startsWith("description:")) {
+                metadata.description = line.substring(12).trim();
+            }
+        }
+
+        return metadata;
+    }
+
+    /**
+     * SKILL.md 元数据内部类
+     */
+    private static class SkillMetadata {
+        String name;
+        String description;
     }
 
     /**
