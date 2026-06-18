@@ -38,6 +38,10 @@
                 <span class="sidebar-item-icon">✨</span>
                 <span class="sidebar-item-text">智能工具测试</span>
             </button>
+            <button class="sidebar-item" data-page="http-test" onclick="switchPage('http-test')">
+                <span class="sidebar-item-icon">🌐</span>
+                <span class="sidebar-item-text">HTTP接口测试</span>
+            </button>
         </nav>
         
         <div class="sidebar-toggle" onclick="toggleSidebar()">
@@ -189,17 +193,10 @@
                             <div class="row g-2 align-items-center">
                                 <div class="col-md-3 col-lg-2">
                                     <select class="form-select" id="filterSetType" onchange="filterSets()">
-                                        <option value="">全部来源</option>
-                                        <option value="internal">内部工具集</option>
-                                        <option value="external">外部工具集</option>
-                                    </select>
-                                </div>
-                                <div class="col-md-3 col-lg-2">
-                                    <select class="form-select" id="filterSetTag" onchange="filterSets()">
-                                        <option value="">全部标签</option>
+                                        <option value="">全部类型</option>
                                         <option value="mcp">MCP</option>
-                                        <option value="skills">Skills</option>
                                         <option value="http">HTTP</option>
+                                        <option value="skills">Skills</option>
                                     </select>
                                 </div>
                                 <div class="col-md-6 col-lg-4">
@@ -364,6 +361,164 @@
                     </div>
                 </div>
             </section>
+            <!-- HTTP接口测试 -->
+            <section class="page-section" id="page-http-test">
+                <div class="d-flex justify-content-between align-items-center mb-4">
+                    <div>
+                        <h4 class="mb-1">HTTP接口测试</h4>
+                        <p class="text-muted mb-0">快速调试和测试 HTTP 接口，类似轻量级 Postman</p>
+                    </div>
+                    <div class="d-flex gap-2">
+                        <button class="btn btn-outline-secondary" onclick="httpTestClearAll()">清空</button>
+                        <button class="btn btn-primary" onclick="httpTestSend()" id="httpTestSendBtn">
+                            <span>▶</span> 发送请求
+                        </button>
+                    </div>
+                </div>
+
+                <!-- 请求区域 -->
+                <div class="card mb-3">
+                    <div class="card-body">
+                        <!-- URL 栏 -->
+                        <div class="http-test-url-bar">
+                            <select class="form-select http-test-method" id="httpTestMethod">
+                                <option value="GET">GET</option>
+                                <option value="POST">POST</option>
+                                <option value="PUT">PUT</option>
+                                <option value="DELETE">DELETE</option>
+                                <option value="PATCH">PATCH</option>
+                                <option value="HEAD">HEAD</option>
+                                <option value="OPTIONS">OPTIONS</option>
+                            </select>
+                            <input type="text" class="form-control http-test-url-input" id="httpTestUrl" placeholder="请输入请求 URL，例如 https://httpbin.org/get">
+                        </div>
+
+                        <!-- 请求配置 Tabs -->
+                        <div class="http-test-tabs mt-3">
+                            <ul class="nav nav-tabs" role="tablist">
+                                <li class="nav-item">
+                                    <button class="nav-link active" data-bs-toggle="tab" data-bs-target="#httpTestHeaders" type="button">Headers</button>
+                                </li>
+                                <li class="nav-item">
+                                    <button class="nav-link" data-bs-toggle="tab" data-bs-target="#httpTestParams" type="button">Query Params</button>
+                                </li>
+                                <li class="nav-item">
+                                    <button class="nav-link" data-bs-toggle="tab" data-bs-target="#httpTestBody" type="button">Body</button>
+                                </li>
+                                <li class="nav-item">
+                                    <button class="nav-link" data-bs-toggle="tab" data-bs-target="#httpTestAuth" type="button">Auth</button>
+                                </li>
+                                <li class="nav-item">
+                                    <button class="nav-link" data-bs-toggle="tab" data-bs-target="#httpTestSettings" type="button">Settings</button>
+                                </li>
+                            </ul>
+                            <div class="tab-content border p-3" style="border-top: none; border-radius: 0 0 8px 8px;">
+                                <!-- Headers -->
+                                <div class="tab-pane fade show active" id="httpTestHeaders">
+                                    <div id="httpTestHeaderList" class="kv-list"></div>
+                                    <button class="btn btn-sm btn-outline-secondary mt-2" onclick="httpTestAddHeader()">+ 添加 Header</button>
+                                </div>
+                                <!-- Query Params -->
+                                <div class="tab-pane fade" id="httpTestParams">
+                                    <div id="httpTestParamList" class="kv-list"></div>
+                                    <button class="btn btn-sm btn-outline-secondary mt-2" onclick="httpTestAddParam()">+ 添加参数</button>
+                                </div>
+                                <!-- Body -->
+                                <div class="tab-pane fade" id="httpTestBody">
+                                    <div class="mb-2">
+                                        <select class="form-select form-select-sm" id="httpTestBodyType" style="width: auto; display: inline-block;">
+                                            <option value="none">none</option>
+                                            <option value="json" selected>JSON</option>
+                                            <option value="text">Text</option>
+                                            <option value="form">Form Data</option>
+                                        </select>
+                                    </div>
+                                    <textarea class="form-control font-monospace" id="httpTestBodyContent" rows="8" placeholder='{"key": "value"}'></textarea>
+                                </div>
+                                <!-- Auth -->
+                                <div class="tab-pane fade" id="httpTestAuth">
+                                    <div class="mb-3">
+                                        <label class="form-label">认证类型</label>
+                                        <select class="form-select" id="httpTestAuthType" onchange="httpTestToggleAuth()">
+                                            <option value="none">无认证</option>
+                                            <option value="bearer">Bearer Token</option>
+                                            <option value="basic">Basic Auth</option>
+                                            <option value="apikey">API Key</option>
+                                        </select>
+                                    </div>
+                                    <div id="httpTestAuthBearer" style="display:none;">
+                                        <div class="mb-3">
+                                            <label class="form-label">Token</label>
+                                            <input type="text" class="form-control" id="httpTestBearerToken" placeholder="输入 Bearer Token">
+                                        </div>
+                                    </div>
+                                    <div id="httpTestAuthBasic" style="display:none;">
+                                        <div class="row g-3">
+                                            <div class="col-md-6">
+                                                <label class="form-label">用户名</label>
+                                                <input type="text" class="form-control" id="httpTestBasicUser" placeholder="Username">
+                                            </div>
+                                            <div class="col-md-6">
+                                                <label class="form-label">密码</label>
+                                                <input type="password" class="form-control" id="httpTestBasicPass" placeholder="Password">
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div id="httpTestAuthApikey" style="display:none;">
+                                        <div class="row g-3">
+                                            <div class="col-md-6">
+                                                <label class="form-label">Key 名称</label>
+                                                <input type="text" class="form-control" id="httpTestApiKeyName" placeholder="X-API-Key">
+                                            </div>
+                                            <div class="col-md-6">
+                                                <label class="form-label">Key 值</label>
+                                                <input type="text" class="form-control" id="httpTestApiKeyValue" placeholder="输入 API Key">
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                                <!-- Settings -->
+                                <div class="tab-pane fade" id="httpTestSettings">
+                                    <div class="row g-3">
+                                        <div class="col-md-4">
+                                            <label class="form-label">超时时间 (ms)</label>
+                                            <input type="number" class="form-control" id="httpTestTimeout" value="30000" min="1000" max="120000">
+                                        </div>
+                                        <div class="col-md-4">
+                                            <label class="form-label">跟随重定向</label>
+                                            <select class="form-select" id="httpTestFollowRedirect">
+                                                <option value="true" selected>是</option>
+                                                <option value="false">否</option>
+                                            </select>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 响应区域 -->
+                <div class="card">
+                    <div class="card-header bg-white d-flex justify-content-between align-items-center">
+                        <span class="fw-semibold">响应结果</span>
+                        <div id="httpTestResponseMeta" class="d-flex gap-3" style="display:none;">
+                            <span class="http-test-status" id="httpTestStatusCode">-</span>
+                            <span class="text-muted" id="httpTestResponseTime">-</span>
+                            <span class="text-muted" id="httpTestResponseSize">-</span>
+                        </div>
+                    </div>
+                    <div class="card-body">
+                        <div id="httpTestResponseContainer">
+                            <div class="empty-state" style="padding: 40px;">
+                                <div class="empty-icon">🌐</div>
+                                <div class="empty-title">等待发送请求</div>
+                                <div class="empty-text">输入 URL 并点击发送按钮</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
         </main>
     </div>
 
@@ -390,5 +545,7 @@
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/echarts@5.4.3/dist/echarts.min.js"></script>
     <script src="/js/ai-tool-governance.js?v=20240616d"></script>
+    <script src="/js/tool-set-patch.js?v=20240616e"></script>
+    <script src="/js/http-test-page.js?v=20240617a"></script>
 </body>
 </html>

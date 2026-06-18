@@ -37,7 +37,8 @@ function switchPage(page) {
         'sets': '工具集管理',
         'tools': '工具管理',
         'models': '大模型管理',
-        'ai-assistant': '智能工具测试'
+        'ai-assistant': '智能工具测试',
+        'http-test': 'HTTP接口测试'
     };
     document.getElementById('pageTitle').textContent = titles[page] || page;
     
@@ -449,45 +450,41 @@ function backToSetsList() {
 
 function openCreateSetModal() {
     createModal({
-        title: '新建工具集',
+        title: '新建外部工具集',
         size: 'lg',
         content: `
             <div class="mb-3">
                 <label class="form-label">工具集名称 <span class="text-danger">*</span></label>
-                <input type="text" class="form-control" id="setName" required placeholder="例如：支付服务" oninput="document.getElementById('mcpServerName') && (document.getElementById('mcpServerName').value = this.value)">
+                <input type="text" class="form-control" id="setName" required placeholder="例如：支付服务">
             </div>
             <div class="mb-3">
                 <label class="form-label">描述</label>
                 <textarea class="form-control" id="setDescription" rows="2" placeholder="工具集功能描述..."></textarea>
             </div>
             <div class="mb-3">
-                <label class="form-label">标签分类</label>
-                <select class="form-select" id="setTag">
-                    <option value="">请选择</option>
-                    <option value="mcp">MCP</option>
-                    <option value="skills">Skills</option>
-                    <option value="http">HTTP</option>
-                </select>
-            </div>
-            <div class="mb-3">
-                <label class="form-label">选择来源 <span class="text-danger">*</span></label>
-                <div class="type-select-grid" style="grid-template-columns: repeat(2, 1fr);">
-                    <div class="type-select-card active" data-type="internal" onclick="selectSetType('internal')">
-                        <div class="type-icon">🏠</div>
-                        <div class="type-name">内部工具集</div>
-                        <div class="type-desc">平台内部管理的工具</div>
-                    </div>
-                    <div class="type-select-card" data-type="external" onclick="selectSetType('external')">
+                <label class="form-label">选择类型 <span class="text-danger">*</span></label>
+                <div class="type-select-grid" style="grid-template-columns: repeat(3, 1fr);">
+                    <div class="type-select-card active" data-type="mcp" onclick="selectSetType('mcp')">
                         <div class="type-icon">🔗</div>
-                        <div class="type-name">外部工具集</div>
+                        <div class="type-name">MCP</div>
                         <div class="type-desc">对接外部 MCP Server</div>
                     </div>
+                    <div class="type-select-card" data-type="http" onclick="selectSetType('http')">
+                        <div class="type-icon">🌐</div>
+                        <div class="type-name">HTTP</div>
+                        <div class="type-desc">对接外部 HTTP API</div>
+                    </div>
+                    <div class="type-select-card" data-type="skills" onclick="selectSetType('skills')">
+                        <div class="type-icon">🛠️</div>
+                        <div class="type-name">Skills</div>
+                        <div class="type-desc">自定义技能/脚本配置</div>
+                    </div>
                 </div>
-                <input type="hidden" id="setType" value="internal">
+                <input type="hidden" id="setTag" value="mcp">
             </div>
-            
-            <!-- 外部工具集：MCP Server 配置 -->
-            <div id="externalConfigPanel" style="display:none;">
+
+            <!-- MCP 类型配置 -->
+            <div id="mcpConfigPanel">
                 <div class="tab-switch">
                     <button class="tab-switch-item active" onclick="switchMcpMode('form')">表单模式</button>
                     <button class="tab-switch-item" onclick="switchMcpMode('json')">JSON模式</button>
@@ -543,23 +540,101 @@ function openCreateSetModal() {
                     </div>
                 </div>
             </div>
+
+            <!-- HTTP 类型配置 -->
+            <div id="httpConfigPanel" style="display:none;">
+                <div class="mb-3">
+                    <label class="form-label">Base URL <span class="text-danger">*</span></label>
+                    <input type="url" class="form-control" id="httpBaseUrl" placeholder="https://api.example.com">
+                </div>
+                <div class="config-panel">
+                    <div class="config-panel-title">请求头 Headers</div>
+                    <div id="httpHeaderList" class="kv-list">
+                        <div class="kv-item">
+                            <input type="text" class="form-control kv-key" placeholder="Header 名称">
+                            <input type="text" class="form-control kv-value" placeholder="Header 值">
+                            <button class="btn btn-outline-secondary btn-sm" onclick="removeKvItem(this)">✕</button>
+                        </div>
+                    </div>
+                    <button class="btn btn-sm btn-outline-secondary" onclick="addKvItem('httpHeaderList')" style="margin-top:8px;">+ 添加 Header</button>
+                </div>
+                <div class="mb-3 mt-3">
+                    <label class="form-label">认证方式</label>
+                    <select class="form-select" id="httpAuthType" onchange="toggleHttpAuth()">
+                        <option value="none">无认证</option>
+                        <option value="bearer">Bearer Token</option>
+                        <option value="basic">Basic Auth</option>
+                        <option value="apikey">API Key</option>
+                    </select>
+                </div>
+                <div id="httpAuthPanel" style="display:none;">
+                    <div class="mb-3" id="httpBearerPanel" style="display:none;">
+                        <label class="form-label">Token</label>
+                        <input type="text" class="form-control" id="httpBearerToken" placeholder="Bearer token...">
+                    </div>
+                    <div class="mb-3" id="httpBasicPanel" style="display:none;">
+                        <div class="grid-2">
+                            <div>
+                                <label class="form-label">用户名</label>
+                                <input type="text" class="form-control" id="httpBasicUser" placeholder="username">
+                            </div>
+                            <div>
+                                <label class="form-label">密码</label>
+                                <input type="password" class="form-control" id="httpBasicPass" placeholder="password">
+                            </div>
+                        </div>
+                    </div>
+                    <div class="mb-3" id="httpApiKeyPanel" style="display:none;">
+                        <div class="grid-2">
+                            <div>
+                                <label class="form-label">Key 名称</label>
+                                <input type="text" class="form-control" id="httpApiKeyName" placeholder="X-API-Key">
+                            </div>
+                            <div>
+                                <label class="form-label">Key 值</label>
+                                <input type="text" class="form-control" id="httpApiKeyValue" placeholder="your-api-key">
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Skills 类型配置 -->
+            <div id="skillsConfigPanel" style="display:none;">
+                <div class="mb-3">
+                    <label class="form-label">自定义配置 (JSON)</label>
+                    <textarea class="form-control font-monospace bg-light" id="skillsCustomConfig" rows="8" placeholder='{\n  "language": "python",\n  "entry": "main.py",\n  "dependencies": ["requests"]\n}'></textarea>
+                </div>
+            </div>
         `,
         onConfirm: () => createSet()
     });
-    
-    setTimeout(() => selectSetType('internal'), 0);
+
+    setTimeout(() => {
+        selectSetType('mcp');
+        // 绑定名称自动同步到 MCP 服务名
+        const nameInput = document.getElementById('setName');
+        const mcpNameInput = document.getElementById('mcpServerName');
+        if (nameInput && mcpNameInput) {
+            nameInput.addEventListener('input', () => {
+                mcpNameInput.value = nameInput.value;
+            });
+        }
+    }, 0);
 }
 
 function selectSetType(type) {
-    document.getElementById('setType').value = type;
+    document.getElementById('setTag').value = type;
     document.querySelectorAll('.type-select-card').forEach(card => {
         card.classList.toggle('active', card.dataset.type === type);
     });
-    
-    const externalPanel = document.getElementById('externalConfigPanel');
-    if (externalPanel) {
-        externalPanel.style.display = type === 'external' ? 'block' : 'none';
-    }
+
+    const mcpPanel = document.getElementById('mcpConfigPanel');
+    const httpPanel = document.getElementById('httpConfigPanel');
+    const skillsPanel = document.getElementById('skillsConfigPanel');
+    if (mcpPanel) mcpPanel.style.display = type === 'mcp' ? 'block' : 'none';
+    if (httpPanel) httpPanel.style.display = type === 'http' ? 'block' : 'none';
+    if (skillsPanel) skillsPanel.style.display = type === 'skills' ? 'block' : 'none';
 }
 
 function switchMcpMode(mode) {
@@ -574,6 +649,18 @@ function toggleMcpTransport() {
     const transport = document.getElementById('mcpTransport').value;
     document.getElementById('mcpStdioPanel').style.display = transport === 'stdio' ? 'block' : 'none';
     document.getElementById('mcpSsePanel').style.display = transport === 'sse' ? 'block' : 'none';
+}
+
+function toggleHttpAuth() {
+    const authType = document.getElementById('httpAuthType').value;
+    const authPanel = document.getElementById('httpAuthPanel');
+    if (authPanel) authPanel.style.display = authType === 'none' ? 'none' : 'block';
+    const bearerPanel = document.getElementById('httpBearerPanel');
+    const basicPanel = document.getElementById('httpBasicPanel');
+    const apiKeyPanel = document.getElementById('httpApiKeyPanel');
+    if (bearerPanel) bearerPanel.style.display = authType === 'bearer' ? 'block' : 'none';
+    if (basicPanel) basicPanel.style.display = authType === 'basic' ? 'block' : 'none';
+    if (apiKeyPanel) apiKeyPanel.style.display = authType === 'apikey' ? 'block' : 'none';
 }
 
 function addKvItem(containerId) {
@@ -636,28 +723,70 @@ function getMcpConfigFromJson() {
     }
 }
 
+function getHttpConfig() {
+    const baseUrl = document.getElementById('httpBaseUrl').value.trim();
+    if (!baseUrl) throw new Error('请填写 Base URL');
+
+    const headers = {};
+    document.querySelectorAll('#httpHeaderList .kv-item').forEach(item => {
+        const key = item.querySelector('.kv-key').value.trim();
+        const value = item.querySelector('.kv-value').value.trim();
+        if (key) headers[key] = value;
+    });
+
+    const authType = document.getElementById('httpAuthType').value;
+    const auth = { type: authType };
+    if (authType === 'bearer') {
+        auth.token = document.getElementById('httpBearerToken').value.trim();
+    } else if (authType === 'basic') {
+        auth.username = document.getElementById('httpBasicUser').value.trim();
+        auth.password = document.getElementById('httpBasicPass').value.trim();
+    } else if (authType === 'apikey') {
+        auth.keyName = document.getElementById('httpApiKeyName').value.trim();
+        auth.keyValue = document.getElementById('httpApiKeyValue').value.trim();
+    }
+
+    return { baseUrl, headers, auth };
+}
+
+function getSkillsConfig() {
+    const jsonText = document.getElementById('skillsCustomConfig').value.trim();
+    if (!jsonText) throw new Error('请填写自定义配置');
+    try {
+        JSON.parse(jsonText);
+        return jsonText;
+    } catch (e) {
+        throw new Error('JSON 格式错误: ' + e.message);
+    }
+}
+
 async function createSet() {
     const name = document.getElementById('setName').value.trim();
     const description = document.getElementById('setDescription').value.trim();
-    const type = document.getElementById('setType').value;
-    
+    const tag = document.getElementById('setTag').value;
+
     if (!name) { showToast('请填写工具集名称', 'warning'); return; }
-    if (!type) { showToast('请选择工具集类型', 'warning'); return; }
-    
-    const payload = { name, description, type, tag: document.getElementById('setTag')?.value || '', status: 1 };
-    
+    if (!tag) { showToast('请选择工具集类型', 'warning'); return; }
+
+    // 固定为外部工具集
+    const payload = { name, description, type: 'external', tag, status: 1 };
+
     try {
-        if (type === 'external') {
+        if (tag === 'mcp') {
             const isJsonMode = document.getElementById('mcpJsonMode').style.display !== 'none';
             payload.mcpConfig = isJsonMode ? getMcpConfigFromJson() : getMcpConfigFromForm();
+        } else if (tag === 'http') {
+            payload.customConfig = JSON.stringify(getHttpConfig());
+        } else if (tag === 'skills') {
+            payload.customConfig = getSkillsConfig();
         }
-        
+
         const response = await fetch(API_BASE, {
             method: 'POST',
             headers: {'Content-Type': 'application/json'},
             body: JSON.stringify(payload)
         });
-        
+
         if (response.ok) {
             showToast('工具集创建成功', 'success');
             closeModal();
