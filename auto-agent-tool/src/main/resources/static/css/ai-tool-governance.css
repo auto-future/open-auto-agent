@@ -1114,6 +1114,160 @@ body {
     margin-top: 4px;
 }
 
+/* ===== HTTP 接口测试页面 ===== */
+.http-test-url-bar {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+}
+
+.http-test-method {
+    width: 130px;
+    flex-shrink: 0;
+    font-weight: 600;
+    font-family: 'SF Mono', monospace;
+}
+
+.http-test-url-input {
+    flex: 1;
+    font-family: 'SF Mono', monospace;
+    font-size: 14px;
+}
+
+.http-test-tabs .nav-tabs {
+    border-bottom: none;
+}
+
+.http-test-tabs .nav-link {
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--text-secondary);
+    padding: 8px 16px;
+    border: none;
+    border-bottom: 2px solid transparent;
+    transition: all 0.3s;
+}
+
+.http-test-tabs .nav-link:hover {
+    color: var(--primary);
+    border-bottom-color: var(--primary-light);
+}
+
+.http-test-tabs .nav-link.active {
+    color: var(--primary);
+    border-bottom-color: var(--primary);
+    background: transparent;
+}
+
+.http-test-status {
+    padding: 2px 10px;
+    border-radius: 4px;
+    font-size: 13px;
+    font-family: 'SF Mono', monospace;
+}
+
+.http-test-response-tabs {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 12px;
+}
+
+.http-test-response-body {
+    background: #1e1e1e;
+    color: #d4d4d4;
+    border-radius: var(--radius);
+    padding: 16px;
+    font-family: 'SF Mono', 'Consolas', monospace;
+    font-size: 13px;
+    line-height: 1.6;
+    overflow-x: auto;
+    max-height: 600px;
+    overflow-y: auto;
+    white-space: pre-wrap;
+    word-break: break-word;
+}
+
+.http-test-response-body.json {
+    color: #9cdcfe;
+}
+
+.http-test-response-body.text {
+    color: #ce9178;
+}
+
+.http-test-headers-table {
+    background: #fafafa;
+    border-radius: 6px;
+    padding: 12px;
+}
+
+.http-test-header-row {
+    display: flex;
+    gap: 12px;
+    padding: 4px 0;
+    border-bottom: 1px solid var(--border);
+    font-size: 13px;
+}
+
+.http-test-header-row:last-child {
+    border-bottom: none;
+}
+
+.http-test-header-key {
+    font-weight: 600;
+    color: var(--primary);
+    min-width: 200px;
+    font-family: 'SF Mono', monospace;
+}
+
+.http-test-header-val {
+    color: var(--text-secondary);
+    font-family: 'SF Mono', monospace;
+    word-break: break-all;
+}
+
+.http-test-response-section {
+    margin-bottom: 16px;
+}
+
+.http-test-response-section-title {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text-secondary);
+    margin-bottom: 8px;
+    text-transform: uppercase;
+}
+
+.http-test-loading {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 60px 20px;
+    color: var(--text-muted);
+}
+
+.http-test-error {
+    text-align: center;
+    padding: 40px 20px;
+}
+
+.http-test-error-icon {
+    font-size: 48px;
+    margin-bottom: 12px;
+}
+
+.http-test-error-msg {
+    color: var(--error);
+    font-size: 14px;
+    font-family: 'SF Mono', monospace;
+    background: #fff1f0;
+    padding: 12px 16px;
+    border-radius: var(--radius);
+    display: inline-block;
+    max-width: 100%;
+    word-break: break-all;
+}
+
 /* ===== 动画 ===== */
 @keyframes fadeIn {
     from { opacity: 0; }

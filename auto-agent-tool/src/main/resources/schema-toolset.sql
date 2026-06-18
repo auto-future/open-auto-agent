@@ -18,8 +18,10 @@ CREATE TABLE IF NOT EXISTS tools (
     name VARCHAR(200) NOT NULL,
     description TEXT,
     tool_set_id VARCHAR(36) NOT NULL,
-    type VARCHAR(50) NOT NULL, -- mcp/http/custom
+    type VARCHAR(50) NOT NULL, -- mcp/http/custom/skills
     input_schema TEXT,
+    resource_path VARCHAR(500), -- skill 目录路径
+    script_content TEXT, -- skill 入口脚本内容
     status INTEGER NOT NULL DEFAULT 1, -- 0-禁用, 1-启用
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,

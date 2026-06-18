@@ -8,8 +8,12 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
 
+import java.io.IOException;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 @RestController
 @RequestMapping("/api/tool-sets")
@@ -107,5 +111,68 @@ public class ToolSetController {
     public ResponseEntity<HttpToolConfigDto> addHttpToolToSet(@PathVariable String toolSetId, @RequestBody HttpToolConfigDto httpToolDto) {
         HttpToolConfigDto addedHttpTool = toolSetService.addHttpToolToSet(toolSetId, httpToolDto);
         return ResponseEntity.ok(addedHttpTool);
+    }
+
+    /**
+     * 根据ID获取HTTP工具
+     */
+    @GetMapping("/{toolSetId}/http-tools/{id}")
+    public ResponseEntity<HttpToolConfigDto> getHttpToolById(@PathVariable String toolSetId, @PathVariable String id) {
+        HttpToolConfigDto httpTool = toolSetService.getHttpToolById(id);
+        return ResponseEntity.ok(httpTool);
+    }
+
+    /**
+     * 更新HTTP工具
+     */
+    @PutMapping("/{toolSetId}/http-tools/{id}")
+    public ResponseEntity<HttpToolConfigDto> updateHttpTool(@PathVariable String toolSetId, @PathVariable String id, @RequestBody HttpToolConfigDto httpToolDto) {
+        HttpToolConfigDto updatedHttpTool = toolSetService.updateHttpTool(id, httpToolDto);
+        return ResponseEntity.ok(updatedHttpTool);
+    }
+
+    /**
+     * 删除HTTP工具
+     */
+    @DeleteMapping("/{toolSetId}/http-tools/{id}")
+    public ResponseEntity<Void> deleteHttpTool(@PathVariable String toolSetId, @PathVariable String id) {
+        toolSetService.deleteHttpTool(id);
+        return ResponseEntity.noContent().build();
+    }
+
+    /**
+     * 启用/禁用HTTP工具
+     */
+    @PatchMapping("/{toolSetId}/http-tools/{id}/status/{status}")
+    public ResponseEntity<HttpToolConfigDto> toggleHttpToolStatus(@PathVariable String toolSetId, @PathVariable String id, @PathVariable Integer status) {
+        HttpToolConfigDto updatedHttpTool = toolSetService.toggleHttpToolStatus(id, status);
+        return ResponseEntity.ok(updatedHttpTool);
+    }
+
+    /**
+     * 批量上传 Skill 目录（zip 文件）
+     */
+    @PostMapping("/{toolSetId}/skills/upload")
+    public ResponseEntity<Map<String, Object>> uploadSkillDirectories(
+            @PathVariable String toolSetId,
+            @RequestParam("file") MultipartFile zipFile) {
+        try {
+            List<ToolDto> tools = toolSetService.uploadSkillDirectories(toolSetId, zipFile);
+            Map<String, Object> result = new HashMap<>();
+            result.put("success", true);
+            result.put("message", "成功导入 " + tools.size() + " 个 Skill");
+            result.put("tools", tools);
+            return ResponseEntity.ok(result);
+        } catch (IOException e) {
+            Map<String, Object> error = new HashMap<>();
+            error.put("success", false);
+            error.put("error", "文件处理失败: " + e.getMessage());
+            return ResponseEntity.badRequest().body(error);
+        } catch (IllegalArgumentException e) {
+            Map<String, Object> error = new HashMap<>();
+            error.put("success", false);
+            error.put("error", e.getMessage());
+            return ResponseEntity.badRequest().body(error);
+        }
     }
 }

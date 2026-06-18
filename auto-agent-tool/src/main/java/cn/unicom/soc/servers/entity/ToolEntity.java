@@ -2,9 +2,8 @@ package cn.unicom.soc.servers.entity;
 
 import jakarta.persistence.*;
 import lombok.Data;
-import org.hibernate.annotations.GenericGenerator;
-
 import java.time.LocalDateTime;
+import java.util.UUID;
 
 @Entity
 @Table(name = "tools")
@@ -12,8 +11,6 @@ import java.time.LocalDateTime;
 public class ToolEntity {
     
     @Id
-    @GeneratedValue(generator = "uuid")
-    @GenericGenerator(name = "uuid", strategy = "uuid2")
     private String id;
     
     @Column(name = "name", nullable = false, length = 200)
@@ -35,6 +32,12 @@ public class ToolEntity {
     @Column(name = "input_schema", columnDefinition = "TEXT")
     private String inputSchema;
     
+    @Column(name = "resource_path", length = 500)
+    private String resourcePath; // skill 目录路径
+    
+    @Column(name = "script_content", columnDefinition = "TEXT")
+    private String scriptContent; // skill 入口脚本内容
+    
     @Column(name = "status", nullable = false)
     private Integer status = 1; // 0-禁用, 1-启用
     
@@ -46,6 +49,9 @@ public class ToolEntity {
     
     @PrePersist
     protected void onCreate() {
+        if (this.id == null) {
+            this.id = UUID.randomUUID().toString();
+        }
         this.createdAt = LocalDateTime.now();
         this.updatedAt = LocalDateTime.now();
     }
