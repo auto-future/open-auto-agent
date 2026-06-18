@@ -1,0 +1,334 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI工具治理平台API文档</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        .api-section {
+            margin: 1.5rem 0;
+            padding: 1rem;
+            background-color: #f8f9fa;
+            border-radius: 0.5rem;
+        }
+        .method-badge {
+            font-size: 0.8em;
+            padding: 0.25rem 0.5rem;
+            border-radius: 0.25rem;
+            color: white;
+        }
+        .get { background-color: #17a2b8; }
+        .post { background-color: #28a745; }
+        .put { background-color: #007bff; }
+        .patch { background-color: #fd7e14; }
+        .delete { background-color: #dc3545; }
+    </style>
+</head>
+<body>
+    <div class="container-fluid mt-4">
+        <div class="row">
+            <div class="col-md-12">
+                <h1>AI工具治理平台API文档</h1>
+                <p class="lead">AI工具治理平台的RESTful API接口</p>
+                <hr>
+            </div>
+        </div>
+        
+        <div class="row">
+            <div class="col-md-12">
+                <!-- 工具集管理API -->
+                <div class="api-section">
+                    <h3>工具集管理</h3>
+                    
+                    <div class="card mb-3">
+                        <div class="card-header">
+                            <span class="method-badge get">GET</span>
+                            <strong>/api/tool-sets</strong> - 获取所有工具集
+                        </div>
+                        <div class="card-body">
+                            <h5>描述</h5>
+                            <p>获取所有工具集的列表</p>
+                            
+                            <h5>请求参数</h5>
+                            <p>无</p>
+                            
+                            <h5>响应示例</h5>
+                            <pre><code>[
+  {
+    "id": "uuid-string",
+    "name": "MCP Tools",
+    "description": "Model Context Protocol Tools",
+    "type": "mcp",
+    "status": 1,
+    "createdAt": "2023-10-01T10:00:00",
+    "updatedAt": "2023-10-01T10:00:00",
+    "tools": [...],
+    "httpTools": [...]
+  }
+]</code></pre>
+                        </div>
+                    </div>
+                    
+                    <div class="card mb-3">
+                        <div class="card-header">
+                            <span class="method-badge get">GET</span>
+                            <strong>/api/tool-sets/{id}</strong> - 根据ID获取工具集
+                        </div>
+                        <div class="card-body">
+                            <h5>描述</h5>
+                            <p>根据ID获取特定工具集的详细信息</p>
+                            
+                            <h5>路径参数</h5>
+                            <ul>
+                                <li><code>id</code> - 工具集ID</li>
+                            </ul>
+                            
+                            <h5>响应示例</h5>
+                            <pre><code>{
+  "id": "uuid-string",
+  "name": "MCP Tools",
+  "description": "Model Context Protocol Tools",
+  "type": "mcp",
+  "status": 1,
+  "createdAt": "2023-10-01T10:00:00",
+  "updatedAt": "2023-10-01T10:00:00",
+  "tools": [...],
+  "httpTools": [...]
+}</code></pre>
+                        </div>
+                    </div>
+                    
+                    <div class="card mb-3">
+                        <div class="card-header">
+                            <span class="method-badge post">POST</span>
+                            <strong>/api/tool-sets</strong> - 创建工具集
+                        </div>
+                        <div class="card-body">
+                            <h5>描述</h5>
+                            <p>创建一个新的工具集</p>
+                            
+                            <h5>请求体</h5>
+                            <pre><code>{
+  "name": "新工具集名称",
+  "description": "工具集描述",
+  "type": "mcp",  // 或 "http"
+  "status": 1     // 1-启用, 0-禁用
+}</code></pre>
+                            
+                            <h5>响应示例</h5>
+                            <pre><code>{
+  "id": "new-uuid-string",
+  "name": "新工具集名称",
+  "description": "工具集描述",
+  "type": "mcp",
+  "status": 1,
+  "createdAt": "2023-10-01T10:00:00",
+  "updatedAt": "2023-10-01T10:00:00",
+  "tools": [],
+  "httpTools": []
+}</code></pre>
+                        </div>
+                    </div>
+                    
+                    <div class="card mb-3">
+                        <div class="card-header">
+                            <span class="method-badge put">PUT</span>
+                            <strong>/api/tool-sets/{id}</strong> - 更新工具集
+                        </div>
+                        <div class="card-body">
+                            <h5>描述</h5>
+                            <p>更新指定ID的工具集信息</p>
+                            
+                            <h5>路径参数</h5>
+                            <ul>
+                                <li><code>id</code> - 工具集ID</li>
+                            </ul>
+                            
+                            <h5>请求体</h5>
+                            <pre><code>{
+  "name": "更新后的名称",
+  "description": "更新后的描述",
+  "type": "http",
+  "status": 1
+}</code></pre>
+                        </div>
+                    </div>
+                    
+                    <div class="card mb-3">
+                        <div class="card-header">
+                            <span class="method-badge delete">DELETE</span>
+                            <strong>/api/tool-sets/{id}</strong> - 删除工具集
+                        </div>
+                        <div class="card-body">
+                            <h5>描述</h5>
+                            <p>删除指定ID的工具集（同时删除其下的所有工具）</p>
+                            
+                            <h5>路径参数</h5>
+                            <ul>
+                                <li><code>id</code> - 工具集ID</li>
+                            </ul>
+                        </div>
+                    </div>
+                    
+                    <div class="card mb-3">
+                        <div class="card-header">
+                            <span class="method-badge patch">PATCH</span>
+                            <strong>/api/tool-sets/{id}/status/{status}</strong> - 更新工具集状态
+                        </div>
+                        <div class="card-body">
+                            <h5>描述</h5>
+                            <p>启用或禁用工具集</p>
+                            
+                            <h5>路径参数</h5>
+                            <ul>
+                                <li><code>id</code> - 工具集ID</li>
+                                <li><code>status</code> - 状态值 (1-启用, 0-禁用)</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- 工具管理API -->
+                <div class="api-section">
+                    <h3>工具管理</h3>
+                    
+                    <div class="card mb-3">
+                        <div class="card-header">
+                            <span class="method-badge post">POST</span>
+                            <strong>/api/tool-sets/{toolSetId}/tools</strong> - 添加工具到工具集
+                        </div>
+                        <div class="card-body">
+                            <h5>描述</h5>
+                            <p>向指定工具集中添加新工具</p>
+                            
+                            <h5>路径参数</h5>
+                            <ul>
+                                <li><code>toolSetId</code> - 工具集ID</li>
+                            </ul>
+                            
+                            <h5>请求体</h5>
+                            <pre><code>{
+  "name": "工具名称",
+  "description": "工具描述",
+  "type": "custom",  // mcp, http, custom
+  "inputSchema": "{...}",  // JSON Schema定义
+  "status": 1
+}</code></pre>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- HTTP工具管理API -->
+                <div class="api-section">
+                    <h3>HTTP工具管理</h3>
+                    
+                    <div class="card mb-3">
+                        <div class="card-header">
+                            <span class="method-badge post">POST</span>
+                            <strong>/api/tool-sets/{toolSetId}/http-tools</strong> - 添加HTTP工具到工具集
+                        </div>
+                        <div class="card-body">
+                            <h5>描述</h5>
+                            <p>向指定工具集中添加新HTTP工具</p>
+                            
+                            <h5>路径参数</h5>
+                            <ul>
+                                <li><code>toolSetId</code> - 工具集ID</li>
+                            </ul>
+                            
+                            <h5>请求体</h5>
+                            <pre><code>{
+  "name": "HTTP工具名称",
+  "description": "HTTP工具描述",
+  "method": "GET",  // GET, POST, PUT, DELETE
+  "url": "https://api.example.com/data",
+  "headers": "{...}",  // JSON格式的请求头
+  "requestBodyTemplate": "{...}",  // POST/PUT请求体模板
+  "responseParsingPattern": "$.data[*]",  // 响应解析模式
+  "status": 1
+}</code></pre>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- 实体定义 -->
+                <div class="api-section">
+                    <h3>实体定义</h3>
+                    
+                    <h5>ToolSetDto</h5>
+                    <pre><code>{
+  "id": "string",           // 工具集唯一标识
+  "name": "string",         // 工具集名称
+  "description": "string",  // 工具集描述
+  "type": "string",         // 工具集类型 (mcp/http)
+  "status": 1,              // 状态 (1-启用, 0-禁用)
+  "createdAt": "datetime",  // 创建时间
+  "updatedAt": "datetime",  // 更新时间
+  "tools": [...],           // 工具列表
+  "httpTools": [...]        // HTTP工具列表
+}</code></pre>
+                    
+                    <h5>ToolDto</h5>
+                    <pre><code>{
+  "id": "string",           // 工具唯一标识
+  "name": "string",         // 工具名称
+  "description": "string",  // 工具描述
+  "toolSetId": "string",    // 所属工具集ID
+  "type": "string",         // 工具类型 (mcp/http/custom)
+  "inputSchema": "string",  // 输入参数Schema (JSON格式)
+  "status": 1,              // 状态 (1-启用, 0-禁用)
+  "createdAt": "datetime",  // 创建时间
+  "updatedAt": "datetime"   // 更新时间
+}</code></pre>
+                    
+                    <h5>HttpToolConfigDto</h5>
+                    <pre><code>{
+  "id": "string",                    // HTTP工具唯一标识
+  "name": "string",                  // HTTP工具名称
+  "description": "string",           // HTTP工具描述
+  "toolSetId": "string",             // 所属工具集ID
+  "method": "string",                // HTTP方法 (GET/POST/PUT/DELETE)
+  "url": "string",                   // API URL模板
+  "headers": "string",               // 请求头 (JSON格式)
+  "requestBodyTemplate": "string",   // 请求体模板 (JSON格式)
+  "responseParsingPattern": "string", // 响应解析模式
+  "status": 1,                       // 状态 (1-启用, 0-禁用)
+  "createdAt": "datetime",           // 创建时间
+  "updatedAt": "datetime"            // 更新时间
+}</code></pre>
+                </div>
+                
+                <!-- 使用示例 -->
+                <div class="api-section">
+                    <h3>使用示例</h3>
+                    
+                    <h5>创建MCP工具集</h5>
+                    <pre><code># 创建请求
+curl -X POST http://localhost:17000/api/tool-sets \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name": "我的MCP工具集",
+    "description": "包含多个MCP协议工具",
+    "type": "mcp",
+    "status": 1
+  }'
+
+# 添加工具到工具集
+curl -X POST http://localhost:17000/api/tool-sets/{toolSetId}/tools \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name": "数据查询工具",
+    "description": "用于查询业务数据",
+    "type": "mcp",
+    "inputSchema": "{...}",
+    "status": 1
+  }'</code></pre>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>

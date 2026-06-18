@@ -1,0 +1,603 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI工具治理平台</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        .tool-set-card {
+            margin-bottom: 1rem;
+            border-left: 4px solid #007bff;
+        }
+        .tool-card {
+            margin: 0.5rem 0;
+            border-left: 2px solid #28a745;
+        }
+        .http-tool-card {
+            margin: 0.5rem 0;
+            border-left: 2px solid #ffc107;
+        }
+    </style>
+</head>
+<body>
+    <div class="container-fluid mt-4">
+        <div class="row">
+            <div class="col-md-12">
+                <h2>AI工具治理平台</h2>
+                <hr>
+            </div>
+        </div>
+        
+        <!-- 工具集管理区域 -->
+        <div class="row mb-4">
+            <div class="col-md-12">
+                <div class="card">
+                    <div class="card-header d-flex justify-content-between align-items-center">
+                        <h5 class="mb-0">工具集管理</h5> <!-- AI工具治理平台 -->
+                        <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#toolSetModal">
+                            新增工具集
+                        </button>
+                    </div>
+                    <div class="card-body">
+                        <div class="row mb-3">
+                            <div class="col-md-3">
+                                <select class="form-select" id="filterType">
+                                    <option value="">全部类型</option>
+                                    <option value="mcp">MCP工具</option>
+                                    <option value="http">HTTP工具</option>
+                                </select>
+                            </div>
+                            <div class="col-md-6">
+                                <input type="text" class="form-control" id="searchName" placeholder="搜索工具集名称...">
+                            </div>
+                            <div class="col-md-3">
+                                <button class="btn btn-outline-secondary" onclick="loadToolSets()">搜索</button>
+                            </div>
+                        </div>
+                        
+                        <div id="toolSetsContainer">
+                            <!-- 工具集卡片将动态加载到这里 -->
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 工具集新增/编辑模态框 -->
+    <div class="modal fade" id="toolSetModal" tabindex="-1" aria-labelledby="toolSetModalLabel" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="toolSetModalLabel">工具集信息</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <form id="toolSetForm">
+                        <input type="hidden" id="toolSetId">
+                        <div class="mb-3">
+                            <label for="toolSetName" class="form-label">名称</label>
+                            <input type="text" class="form-control" id="toolSetName" required>
+                        </div>
+                        <div class="mb-3">
+                            <label for="toolSetDescription" class="form-label">描述</label>
+                            <textarea class="form-control" id="toolSetDescription" rows="3"></textarea>
+                        </div>
+                        <div class="mb-3">
+                            <label for="toolSetType" class="form-label">类型</label>
+                            <select class="form-select" id="toolSetType" required>
+                                <option value="mcp">MCP工具</option>
+                                <option value="http">HTTP工具</option>
+                            </select>
+                        </div>
+                        <div class="mb-3">
+                            <label for="toolSetStatus" class="form-label">状态</label>
+                            <select class="form-select" id="toolSetStatus">
+                                <option value="1">启用</option>
+                                <option value="0">禁用</option>
+                            </select>
+                        </div>
+                    </form>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+                    <button type="button" class="btn btn-primary" onclick="saveToolSet()">保存</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 工具新增模态框 -->
+    <div class="modal fade" id="toolModal" tabindex="-1" aria-labelledby="toolModalLabel" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="toolModalLabel">工具信息</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <form id="toolForm">
+                        <input type="hidden" id="toolId">
+                        <input type="hidden" id="toolSetIdForTool">
+                        <div class="mb-3">
+                            <label for="toolName" class="form-label">名称</label>
+                            <input type="text" class="form-control" id="toolName" required>
+                        </div>
+                        <div class="mb-3">
+                            <label for="toolDescription" class="form-label">描述</label>
+                            <textarea class="form-control" id="toolDescription" rows="3"></textarea>
+                        </div>
+                        <div class="mb-3">
+                            <label for="toolType" class="form-label">类型</label>
+                            <select class="form-select" id="toolType">
+                                <option value="mcp">MCP工具</option>
+                                <option value="http">HTTP工具</option>
+                                <option value="custom">自定义工具</option>
+                            </select>
+                        </div>
+                        <div class="mb-3">
+                            <label for="toolInputSchema" class="form-label">输入Schema</label>
+                            <textarea class="form-control" id="toolInputSchema" rows="4" placeholder='{\n  "type": "object",\n  "properties": {\n    "param1": {\n      "type": "string",\n      "description": "参数描述"\n    }\n  },\n  "required": ["param1"]\n}'></textarea>
+                        </div>
+                        <div class="mb-3">
+                            <label for="toolStatus" class="form-label">状态</label>
+                            <select class="form-select" id="toolStatus">
+                                <option value="1">启用</option>
+                                <option value="0">禁用</option>
+                            </select>
+                        </div>
+                    </form>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+                    <button type="button" class="btn btn-primary" onclick="saveTool()">保存</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- HTTP工具新增模态框 -->
+    <div class="modal fade" id="httpToolModal" tabindex="-1" aria-labelledby="httpToolModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="httpToolModalLabel">HTTP工具信息</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <form id="httpToolForm">
+                        <input type="hidden" id="httpToolId">
+                        <input type="hidden" id="toolSetIdForHttpTool">
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label for="httpToolName" class="form-label">名称</label>
+                                    <input type="text" class="form-control" id="httpToolName" required>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label for="httpToolMethod" class="form-label">请求方法</label>
+                                    <select class="form-select" id="httpToolMethod">
+                                        <option value="GET">GET</option>
+                                        <option value="POST">POST</option>
+                                        <option value="PUT">PUT</option>
+                                        <option value="DELETE">DELETE</option>
+                                        <option value="PATCH">PATCH</option>
+                                    </select>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="mb-3">
+                            <label for="httpToolDescription" class="form-label">描述</label>
+                            <textarea class="form-control" id="httpToolDescription" rows="2"></textarea>
+                        </div>
+                        <div class="mb-3">
+                            <label for="httpToolUrl" class="form-label">URL模板</label>
+                            <input type="text" class="form-control" id="httpToolUrl" placeholder="例如: https://api.example.com/users/{id}">
+                        </div>
+                        <div class="mb-3">
+                            <label for="httpToolHeaders" class="form-label">请求头</label>
+                            <textarea class="form-control" id="httpToolHeaders" rows="3" placeholder='{\n  "Content-Type": "application/json",\n  "Authorization": "Bearer {token}"\n}'></textarea>
+                        </div>
+                        <div class="mb-3">
+                            <label for="httpToolBodyTemplate" class="form-label">请求体模板</label>
+                            <textarea class="form-control" id="httpToolBodyTemplate" rows="4" placeholder='{\n  "name": "{name}",\n  "email": "{email}"\n}'></textarea>
+                        </div>
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label for="httpToolStatus" class="form-label">状态</label>
+                                    <select class="form-select" id="httpToolStatus">
+                                        <option value="1">启用</option>
+                                        <option value="0">禁用</option>
+                                    </select>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label for="httpToolResponsePattern" class="form-label">响应解析模式</label>
+                                    <input type="text" class="form-control" id="httpToolResponsePattern" placeholder="例如: $.data.items[*]">
+                                </div>
+                            </div>
+                        </div>
+                    </form>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+                    <button type="button" class="btn btn-primary" onclick="saveHttpTool()">保存</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        // 页面加载完成后自动加载工具集
+        document.addEventListener('DOMContentLoaded', function() {
+            loadToolSets();
+        });
+
+        // 加载工具集列表
+        async function loadToolSets() {
+            try {
+                const response = await fetch('/api/tool-sets');
+                const toolSets = await response.json();
+                
+                const container = document.getElementById('toolSetsContainer');
+                container.innerHTML = '';
+                
+                toolSets.forEach(toolSet => {
+                    const toolSetCard = createToolSetCard(toolSet);
+                    container.appendChild(toolSetCard);
+                });
+            } catch (error) {
+                console.error('加载工具集失败:', error);
+                alert('加载工具集失败: ' + error.message);
+            }
+        }
+
+        // 创建工具集卡片
+        function createToolSetCard(toolSet) {
+            const card = document.createElement('div');
+            card.className = 'card tool-set-card';
+            card.innerHTML = `
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-start">
+                        <div>
+                            <h5 class="card-title">${toolSet.name} <span class="badge bg-${toolSet.status === 1 ? 'success' : 'secondary'}">${toolSet.status === 1 ? '启用' : '禁用'}</span></h5>
+                            <p class="card-text">${toolSet.description || '暂无描述'}</p>
+                            <small class="text-muted">类型: ${toolSet.type} | 创建时间: ${toolSet.createdAt} | 更新时间: ${toolSet.updatedAt}</small>
+                        </div>
+                        <div>
+                            <div class="btn-group" role="group">
+                                <button type="button" class="btn btn-sm btn-outline-primary" onclick="editToolSet('${toolSet.id}')">编辑</button>
+                                <button type="button" class="btn btn-sm btn-outline-${toolSet.status === 1 ? 'warning' : 'success'}" onclick="toggleToolSetStatus('${toolSet.id}', ${toolSet.status === 1 ? 0 : 1})">${toolSet.status === 1 ? '禁用' : '启用'}</button>
+                                <button type="button" class="btn btn-sm btn-outline-danger" onclick="deleteToolSet('${toolSet.id}')">删除</button>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="mt-3">
+                        <h6>工具列表:</h6>
+                        <div id="tools-${toolSet.id}">
+                            ${(toolSet.tools || []).map(tool => createToolCard(tool, toolSet.id)).join('')}
+                        </div>
+                        <button type="button" class="btn btn-sm btn-outline-success mt-2" onclick="showAddToolModal('${toolSet.id}', '${toolSet.name}')">
+                            + 添加工具
+                        </button>
+                    </div>
+                    
+                    <div class="mt-3">
+                        <h6>HTTP工具列表:</h6>
+                        <div id="http-tools-${toolSet.id}">
+                            ${(toolSet.httpTools || []).map(httpTool => createHttpToolCard(httpTool, toolSet.id)).join('')}
+                        </div>
+                        <button type="button" class="btn btn-sm btn-outline-warning mt-2" onclick="showAddHttpToolModal('${toolSet.id}', '${toolSet.name}')">
+                            + 添加HTTP工具
+                        </button>
+                    </div>
+                </div>
+            `;
+            return card;
+        }
+
+        // 创建工具卡片
+        function createToolCard(tool, toolSetId) {
+            return `
+                <div class="card tool-card">
+                    <div class="card-body p-2">
+                        <div class="d-flex justify-content-between">
+                            <div>
+                                <strong>${tool.name}</strong>
+                                <p class="mb-0" style="font-size: 0.9em;">${tool.description || ''}</p>
+                                <small class="text-muted">类型: ${tool.type} | 状态: ${tool.status === 1 ? '启用' : '禁用'}</small>
+                            </div>
+                            <div>
+                                <button type="button" class="btn btn-sm btn-outline-primary" onclick="editTool('${tool.id}', '${toolSetId}')">编辑</button>
+                                <button type="button" class="btn btn-sm btn-outline-danger" onclick="deleteTool('${tool.id}')">删除</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `;
+        }
+
+        // 创建HTTP工具卡片
+        function createHttpToolCard(httpTool, toolSetId) {
+            return `
+                <div class="card http-tool-card">
+                    <div class="card-body p-2">
+                        <div class="d-flex justify-content-between">
+                            <div>
+                                <strong>${httpTool.name}</strong> [${httpTool.method}]
+                                <p class="mb-0" style="font-size: 0.9em;">${httpTool.description || ''}</p>
+                                <small class="text-muted">URL: ${httpTool.url || ''} | 状态: ${httpTool.status === 1 ? '启用' : '禁用'}</small>
+                            </div>
+                            <div>
+                                <button type="button" class="btn btn-sm btn-outline-primary" onclick="editHttpTool('${httpTool.id}', '${toolSetId}')">编辑</button>
+                                <button type="button" class="btn btn-sm btn-outline-danger" onclick="deleteHttpTool('${httpTool.id}')">删除</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `;
+        }
+
+        // 编辑工具集
+        function editToolSet(id) {
+            fetch(`/api/tool-sets/${id}`)
+                .then(response => response.json())
+                .then(toolSet => {
+                    document.getElementById('toolSetId').value = toolSet.id;
+                    document.getElementById('toolSetName').value = toolSet.name;
+                    document.getElementById('toolSetDescription').value = toolSet.description || '';
+                    document.getElementById('toolSetType').value = toolSet.type;
+                    document.getElementById('toolSetStatus').value = toolSet.status;
+                    
+                    const modal = new bootstrap.Modal(document.getElementById('toolSetModal'));
+                    modal.show();
+                })
+                .catch(error => {
+                    console.error('获取工具集信息失败:', error);
+                    alert('获取工具集信息失败: ' + error.message);
+                });
+        }
+
+        // 显示添加工具集模态框
+        function showAddToolSetModal() {
+            document.getElementById('toolSetForm').reset();
+            document.getElementById('toolSetId').value = '';
+            document.getElementById('toolSetModalLabel').textContent = '新增工具集';
+            
+            const modal = new bootstrap.Modal(document.getElementById('toolSetModal'));
+            modal.show();
+        }
+
+        // 保存工具集
+        async function saveToolSet() {
+            const id = document.getElementById('toolSetId').value;
+            const toolSetData = {
+                name: document.getElementById('toolSetName').value,
+                description: document.getElementById('toolSetDescription').value,
+                type: document.getElementById('toolSetType').value,
+                status: parseInt(document.getElementById('toolSetStatus').value)
+            };
+
+            try {
+                let response;
+                if (id) {
+                    // 更新
+                    response = await fetch(`/api/tool-sets/${id}`, {
+                        method: 'PUT',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify(toolSetData)
+                    });
+                } else {
+                    // 创建
+                    response = await fetch('/api/tool-sets', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify(toolSetData)
+                    });
+                }
+
+                if (response.ok) {
+                    const modal = bootstrap.Modal.getInstance(document.getElementById('toolSetModal'));
+                    modal.hide();
+                    loadToolSets();
+                    alert('保存成功！');
+                } else {
+                    const error = await response.text();
+                    alert('保存失败: ' + error);
+                }
+            } catch (error) {
+                console.error('保存工具集失败:', error);
+                alert('保存失败: ' + error.message);
+            }
+        }
+
+        // 删除工具集
+        async function deleteToolSet(id) {
+            if (!confirm('确定要删除这个工具集吗？此操作不可恢复。')) {
+                return;
+            }
+
+            try {
+                const response = await fetch(`/api/tool-sets/${id}`, {
+                    method: 'DELETE'
+                });
+
+                if (response.ok) {
+                    loadToolSets();
+                    alert('删除成功！');
+                } else {
+                    const error = await response.text();
+                    alert('删除失败: ' + error);
+                }
+            } catch (error) {
+                console.error('删除工具集失败:', error);
+                alert('删除失败: ' + error.message);
+            }
+        }
+
+        // 切换工具集状态
+        async function toggleToolSetStatus(id, status) {
+            try {
+                const response = await fetch(`/api/tool-sets/${id}/status/${status}`, {
+                    method: 'PATCH'
+                });
+
+                if (response.ok) {
+                    loadToolSets();
+                    alert(`状态已${status === 1 ? '启用' : '禁用'}！`);
+                } else {
+                    const error = await response.text();
+                    alert('状态切换失败: ' + error);
+                }
+            } catch (error) {
+                console.error('切换工具集状态失败:', error);
+                alert('状态切换失败: ' + error.message);
+            }
+        }
+
+        // 显示添加工具模态框
+        function showAddToolModal(toolSetId, toolSetName) {
+            document.getElementById('toolForm').reset();
+            document.getElementById('toolId').value = '';
+            document.getElementById('toolSetIdForTool').value = toolSetId;
+            document.getElementById('toolModalLabel').innerHTML = `为 "${toolSetName}" 添加工具`;
+            
+            const modal = new bootstrap.Modal(document.getElementById('toolModal'));
+            modal.show();
+        }
+
+        // 编辑工具
+        function editTool(toolId, toolSetId) {
+            // 这里需要从API获取工具详情并填充表单
+            // 模拟获取工具详情
+            // 在实际应用中，您需要实现获取工具详情的API
+            alert('编辑工具功能待完善');
+        }
+
+        // 保存工具
+        async function saveTool() {
+            const toolData = {
+                name: document.getElementById('toolName').value,
+                description: document.getElementById('toolDescription').value,
+                toolSetId: document.getElementById('toolSetIdForTool').value,
+                type: document.getElementById('toolType').value,
+                inputSchema: document.getElementById('toolInputSchema').value,
+                status: parseInt(document.getElementById('toolStatus').value)
+            };
+
+            try {
+                const toolSetId = document.getElementById('toolSetIdForTool').value;
+                const response = await fetch(`/api/tool-sets/${toolSetId}/tools`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(toolData)
+                });
+
+                if (response.ok) {
+                    const modal = bootstrap.Modal.getInstance(document.getElementById('toolModal'));
+                    modal.hide();
+                    loadToolSets(); // 重新加载整个页面以更新工具列表
+                    alert('工具保存成功！');
+                } else {
+                    const error = await response.text();
+                    alert('工具保存失败: ' + error);
+                }
+            } catch (error) {
+                console.error('保存工具失败:', error);
+                alert('保存工具失败: ' + error.message);
+            }
+        }
+
+        // 显示添加HTTP工具模态框
+        function showAddHttpToolModal(toolSetId, toolSetName) {
+            document.getElementById('httpToolForm').reset();
+            document.getElementById('httpToolId').value = '';
+            document.getElementById('toolSetIdForHttpTool').value = toolSetId;
+            document.getElementById('httpToolModalLabel').innerHTML = `为 "${toolSetName}" 添加HTTP工具`;
+            
+            const modal = new bootstrap.Modal(document.getElementById('httpToolModal'));
+            modal.show();
+        }
+
+        // 编辑HTTP工具
+        function editHttpTool(httpToolId, toolSetId) {
+            // 这里需要从API获取HTTP工具详情并填充表单
+            // 模拟获取工具详情
+            // 在实际应用中，您需要实现获取HTTP工具详情的API
+            alert('编辑HTTP工具功能待完善');
+        }
+
+        // 保存HTTP工具
+        async function saveHttpTool() {
+            const httpToolData = {
+                name: document.getElementById('httpToolName').value,
+                description: document.getElementById('httpToolDescription').value,
+                toolSetId: document.getElementById('toolSetIdForHttpTool').value,
+                method: document.getElementById('httpToolMethod').value,
+                url: document.getElementById('httpToolUrl').value,
+                headers: document.getElementById('httpToolHeaders').value,
+                requestBodyTemplate: document.getElementById('httpToolBodyTemplate').value,
+                responseParsingPattern: document.getElementById('httpToolResponsePattern').value,
+                status: parseInt(document.getElementById('httpToolStatus').value)
+            };
+
+            try {
+                const toolSetId = document.getElementById('toolSetIdForHttpTool').value;
+                const response = await fetch(`/api/tool-sets/${toolSetId}/http-tools`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(httpToolData)
+                });
+
+                if (response.ok) {
+                    const modal = bootstrap.Modal.getInstance(document.getElementById('httpToolModal'));
+                    modal.hide();
+                    loadToolSets(); // 重新加载整个页面以更新HTTP工具列表
+                    alert('HTTP工具保存成功！');
+                } else {
+                    const error = await response.text();
+                    alert('HTTP工具保存失败: ' + error);
+                }
+            } catch (error) {
+                console.error('保存HTTP工具失败:', error);
+                alert('保存HTTP工具失败: ' + error.message);
+            }
+        }
+
+        // 删除工具
+        async function deleteTool(toolId) {
+            if (!confirm('确定要删除这个工具吗？')) {
+                return;
+            }
+
+            // 这里需要实现删除工具的API调用
+            alert('删除工具功能待完善');
+        }
+
+        // 删除HTTP工具
+        async function deleteHttpTool(httpToolId) {
+            if (!confirm('确定要删除这个HTTP工具吗？')) {
+                return;
+            }
+
+            // 这里需要实现删除HTTP工具的API调用
+            alert('删除HTTP工具功能待完善');
+        }
+    </script>
+</body>
+</html>
