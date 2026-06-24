@@ -79,7 +79,11 @@ public class HttpApiManagerService implements McpToolManagerServiceInterface {
                     },
                     "paramsSchema": {
                       "type": "object",
-                      "description": "参数模式定义"
+                      "description": "请求参数JSON Schema定义"
+                    },
+                    "responseSchema": {
+                      "type": "object",
+                      "description": "响应结果JSON Schema定义"
                     },
                     "authType": {
                       "type": "string",
@@ -162,6 +166,9 @@ public class HttpApiManagerService implements McpToolManagerServiceInterface {
                 if (config.getParamsSchema() == null) {
                     config.setParamsSchema(existingConfig.getParamsSchema());
                 }
+                if (config.getResponseSchema() == null) {
+                    config.setResponseSchema(existingConfig.getResponseSchema());
+                }
                 if (config.getAuthType() == null) {
                     config.setAuthType(existingConfig.getAuthType());
                 }
@@ -174,7 +181,7 @@ public class HttpApiManagerService implements McpToolManagerServiceInterface {
                 if (config.getEnabled() == null) {
                     config.setEnabled(existingConfig.getEnabled());
                 }
-                
+
                 config.setId(id);
             } else {
                 // 新增操作，使用原有逻辑
@@ -183,6 +190,11 @@ public class HttpApiManagerService implements McpToolManagerServiceInterface {
 
             // 保存到数据库
             int savedId = registryService.saveOrUpdate(config);
+
+            // 自动注册到MCP工具
+            if (toolCallbackProvider != null && config.getEnabled() != null && config.getEnabled()) {
+                registryService.registerHttpToolToMcp(config, toolCallbackProvider, currentToolNames, executorService);
+            }
 
             logger.info("Added/Updated HTTP API: {} with ID: {}", config.getToolName(), savedId);
 
@@ -231,11 +243,22 @@ public class HttpApiManagerService implements McpToolManagerServiceInterface {
         try {
             int id = Integer.parseInt(params.get("id").toString());
 
+            // 先查询获取工具名称，以便从MCP中移除
+            HttpToolConfig existingConfig = SqliteDBManager.findById(id);
+            String toolName = existingConfig != null ? existingConfig.getToolName() : null;
+
             // 从数据库删除
             boolean deleted = registryService.deleteById(id);
 
             if (deleted) {
                 logger.info("Deleted HTTP API with ID: {}", id);
+
+                // 从MCP工具列表中移除
+                if (toolName != null && toolCallbackProvider != null) {
+                    toolCallbackProvider.removeTool(toolName);
+                    currentToolNames.remove(toolName);
+                    logger.info("Removed HTTP API from MCP: {}", toolName);
+                }
 
                 Map<String, Object> result = new HashMap<>();
                 result.put("success", true);
@@ -369,7 +392,11 @@ public class HttpApiManagerService implements McpToolManagerServiceInterface {
                           },
                           "paramsSchema": {
                             "type": "object",
-                            "description": "参数模式定义"
+                            "description": "请求参数JSON Schema定义"
+                          },
+                          "responseSchema": {
+                            "type": "object",
+                            "description": "响应结果JSON Schema定义"
                           },
                           "authType": {
                             "type": "string",
@@ -430,6 +457,11 @@ public class HttpApiManagerService implements McpToolManagerServiceInterface {
                     // 设置ID为null，确保是添加新记录
                     config.setId(null);
                     int id = SqliteDBManager.saveOrUpdate(config);
+
+                    // 自动注册到MCP工具
+                    if (toolCallbackProvider != null && config.getEnabled() != null && config.getEnabled()) {
+                        registryService.registerHttpToolToMcp(config, toolCallbackProvider, currentToolNames, executorService);
+                    }
 
                     Map<String, Object> toolResult = new HashMap<>();
                     toolResult.put("toolName", config.getToolName());
@@ -520,7 +552,11 @@ public class HttpApiManagerService implements McpToolManagerServiceInterface {
                           },
                           "paramsSchema": {
                             "type": "object",
-                            "description": "参数模式定义"
+                            "description": "请求参数JSON Schema定义"
+                          },
+                          "responseSchema": {
+                            "type": "object",
+                            "description": "响应结果JSON Schema定义"
                           },
                           "authType": {
                             "type": "string",
@@ -603,7 +639,7 @@ public class HttpApiManagerService implements McpToolManagerServiceInterface {
                     
                     // 创建一个新的配置对象，只包含需要更新的字段
                     HttpToolConfig updateConfig = parseToolConfig(toolNode);
-                    
+
                     // 保留现有配置中的未更新字段
                     if (updateConfig.getToolName() == null) {
                         updateConfig.setToolName(existingConfig.getToolName());
@@ -626,6 +662,9 @@ public class HttpApiManagerService implements McpToolManagerServiceInterface {
                     if (updateConfig.getParamsSchema() == null) {
                         updateConfig.setParamsSchema(existingConfig.getParamsSchema());
                     }
+                    if (updateConfig.getResponseSchema() == null) {
+                        updateConfig.setResponseSchema(existingConfig.getResponseSchema());
+                    }
                     if (updateConfig.getAuthType() == null) {
                         updateConfig.setAuthType(existingConfig.getAuthType());
                     }
@@ -638,10 +677,15 @@ public class HttpApiManagerService implements McpToolManagerServiceInterface {
                     if (updateConfig.getEnabled() == null) {
                         updateConfig.setEnabled(existingConfig.getEnabled());
                     }
-                    
+
                     // 设置ID以确保更新现有记录
                     updateConfig.setId(id);
                     int updatedId = SqliteDBManager.saveOrUpdate(updateConfig);
+
+                    // 自动注册到MCP工具
+                    if (toolCallbackProvider != null && updateConfig.getEnabled() != null && updateConfig.getEnabled()) {
+                        registryService.registerHttpToolToMcp(updateConfig, toolCallbackProvider, currentToolNames, executorService);
+                    }
 
                     Map<String, Object> toolResult = new HashMap<>();
                     toolResult.put("toolName", updateConfig.getToolName());
@@ -726,7 +770,11 @@ public class HttpApiManagerService implements McpToolManagerServiceInterface {
                 },
                 "paramsSchema": {
                   "type": "object",
-                  "description": "参数模式定义"
+                  "description": "请求参数JSON Schema定义"
+                },
+                "responseSchema": {
+                  "type": "object",
+                  "description": "响应结果JSON Schema定义"
                 },
                 "authType": {
                   "type": "string",
@@ -754,20 +802,25 @@ public class HttpApiManagerService implements McpToolManagerServiceInterface {
             // 构建JsonNode对象
             JsonNode toolNode = objectMapper.valueToTree(params);
             HttpToolConfig config = parseToolConfig(toolNode);
-            
+
             // 设置ID为null，确保是插入新记录
             config.setId(null);
-            
+
             int id = SqliteDBManager.saveOrUpdate(config);
-            
+
+            // 自动注册到MCP工具
+            if (toolCallbackProvider != null && config.getEnabled() != null && config.getEnabled()) {
+                registryService.registerHttpToolToMcp(config, toolCallbackProvider, currentToolNames, executorService);
+            }
+
             Map<String, Object> result = new HashMap<>();
             result.put("success", true);
             result.put("message", "HTTP API added successfully");
             result.put("id", id);
             result.put("toolName", config.getToolName());
-            
+
             logger.info("Added new HTTP API with ID: {}, Name: {}", id, config.getToolName());
-            
+
             return objectMapper.writeValueAsString(result);
         } catch (Exception e) {
             logger.error("Failed to add HTTP API with params: {}", params, e);
@@ -828,7 +881,11 @@ public class HttpApiManagerService implements McpToolManagerServiceInterface {
                 },
                 "paramsSchema": {
                   "type": "object",
-                  "description": "参数模式定义"
+                  "description": "请求参数JSON Schema定义"
+                },
+                "responseSchema": {
+                  "type": "object",
+                  "description": "响应结果JSON Schema定义"
                 },
                 "authType": {
                   "type": "string",
@@ -896,6 +953,9 @@ public class HttpApiManagerService implements McpToolManagerServiceInterface {
             if (updateConfig.getParamsSchema() == null) {
                 updateConfig.setParamsSchema(existingConfig.getParamsSchema());
             }
+            if (updateConfig.getResponseSchema() == null) {
+                updateConfig.setResponseSchema(existingConfig.getResponseSchema());
+            }
             if (updateConfig.getAuthType() == null) {
                 updateConfig.setAuthType(existingConfig.getAuthType());
             }
@@ -908,20 +968,25 @@ public class HttpApiManagerService implements McpToolManagerServiceInterface {
             if (updateConfig.getEnabled() == null) {
                 updateConfig.setEnabled(existingConfig.getEnabled());
             }
-            
+
             // 设置ID以确保更新现有记录
             updateConfig.setId(id);
-            
+
             int updatedId = SqliteDBManager.saveOrUpdate(updateConfig);
-            
+
+            // 自动注册到MCP工具
+            if (toolCallbackProvider != null && updateConfig.getEnabled() != null && updateConfig.getEnabled()) {
+                registryService.registerHttpToolToMcp(updateConfig, toolCallbackProvider, currentToolNames, executorService);
+            }
+
             Map<String, Object> result = new HashMap<>();
             result.put("success", true);
             result.put("message", "HTTP API updated successfully");
             result.put("id", updatedId);
             result.put("toolName", updateConfig.getToolName());
-            
+
             logger.info("Updated HTTP API with ID: {}, Name: {}", updatedId, updateConfig.getToolName());
-            
+
             return objectMapper.writeValueAsString(result);
         } catch (Exception e) {
             logger.error("Failed to update HTTP API with params: {}", params, e);
@@ -984,6 +1049,11 @@ public class HttpApiManagerService implements McpToolManagerServiceInterface {
             config.setParamsSchema(node.get("paramsSchema").toString());
         }
 
+        // responseSchema: JSON Schema 对象转为字符串
+        if (node.has("responseSchema") && !node.get("responseSchema").isNull()) {
+            config.setResponseSchema(node.get("responseSchema").toString());
+        }
+
         // authConfig
         if (node.has("authConfig") && !node.get("authConfig").isNull()) {
             config.setAuthConfig(node.get("authConfig").toString());
@@ -997,6 +1067,11 @@ public class HttpApiManagerService implements McpToolManagerServiceInterface {
         // enabled
         if (node.has("enabled")) {
             config.setEnabled(node.get("enabled").asBoolean());
+        }
+
+        // 如果未提供请求schema，根据URL模板和请求体模板自动生成
+        if (config.getParamsSchema() == null || config.getParamsSchema().trim().isEmpty()) {
+            config.setParamsSchema(HttpToolRegistryService.generateDefaultRequestSchema(config));
         }
 
         return config;
@@ -1046,6 +1121,12 @@ public class HttpApiManagerService implements McpToolManagerServiceInterface {
 
             if (updated) {
                 logger.info("Enabled HTTP API with ID: {}", id);
+
+                // 自动注册到MCP工具
+                HttpToolConfig config = SqliteDBManager.findById(id);
+                if (config != null && toolCallbackProvider != null) {
+                    registryService.registerHttpToolToMcp(config, toolCallbackProvider, currentToolNames, executorService);
+                }
 
                 Map<String, Object> result = new HashMap<>();
                 result.put("success", true);
@@ -1112,11 +1193,22 @@ public class HttpApiManagerService implements McpToolManagerServiceInterface {
         try {
             int id = Integer.parseInt(params.get("id").toString());
 
+            // 先查询获取工具名称，以便从MCP中移除
+            HttpToolConfig existingConfig = SqliteDBManager.findById(id);
+            String toolName = existingConfig != null ? existingConfig.getToolName() : null;
+
             // 从数据库更新启用状态
             boolean updated = registryService.updateEnabledStatusById(id, false);
 
             if (updated) {
                 logger.info("Disabled HTTP API with ID: {}", id);
+
+                // 从MCP工具列表中移除
+                if (toolName != null && toolCallbackProvider != null) {
+                    toolCallbackProvider.removeTool(toolName);
+                    currentToolNames.remove(toolName);
+                    logger.info("Removed disabled HTTP API from MCP: {}", toolName);
+                }
 
                 Map<String, Object> result = new HashMap<>();
                 result.put("success", true);
@@ -1166,6 +1258,57 @@ public class HttpApiManagerService implements McpToolManagerServiceInterface {
     }
 
     /**
+     * 刷新MCP工具列表，重新加载所有启用的HTTP API
+     *
+     * @return 操作结果
+     */
+    public String refreshMcpTools() {
+        try {
+            logger.info("Refreshing MCP tools...");
+
+            // 从MCP中移除所有当前已注册的HTTP工具
+            if (toolCallbackProvider != null) {
+                for (String toolName : new ArrayList<>(currentToolNames)) {
+                    toolCallbackProvider.removeTool(toolName);
+                }
+            }
+            currentToolNames.clear();
+
+            // 重新加载所有启用的HTTP工具
+            List<HttpToolConfig> allConfigs = registryService.findAllEnabled();
+            int addedCount = 0;
+            for (HttpToolConfig config : allConfigs) {
+                if (toolCallbackProvider != null) {
+                    registryService.registerHttpToolToMcp(config, toolCallbackProvider, currentToolNames, executorService);
+                    addedCount++;
+                }
+            }
+
+            Map<String, Object> result = new HashMap<>();
+            result.put("success", true);
+            result.put("message", "MCP tools refreshed successfully");
+            result.put("total", allConfigs.size());
+            result.put("registered", addedCount);
+
+            logger.info("Refreshed MCP tools. Total: {}, Registered: {}", allConfigs.size(), addedCount);
+
+            return objectMapper.writeValueAsString(result);
+        } catch (Exception e) {
+            logger.error("Failed to refresh MCP tools", e);
+
+            Map<String, Object> result = new HashMap<>();
+            result.put("success", false);
+            result.put("error", e.getMessage());
+
+            try {
+                return objectMapper.writeValueAsString(result);
+            } catch (JsonProcessingException jsonException) {
+                return "{\"success\": false, \"error\": \"Internal error occurred\"}";
+            }
+        }
+    }
+
+    /**
      * 定时扫描数据库，加载新增或更新的API
      */
     @Scheduled(fixedDelay = 30000) // 每30秒扫描一次
@@ -1189,7 +1332,7 @@ public class HttpApiManagerService implements McpToolManagerServiceInterface {
                         GenericToolCallback callback = new GenericToolCallback(
                                 config.getToolName(),
                                 config.getToolDescription() != null ? config.getToolDescription() : "HTTP API tool: " + config.getToolName(),
-                                config.getParamsSchema() != null ? config.getParamsSchema() : "{}",
+                                config.getParamsSchema() != null ? config.getParamsSchema() : HttpToolRegistryService.generateDefaultRequestSchema(config),
                                 (toolInput) -> {
                                     try {
                                         return executorService.executeToolCall(config, toolInput);

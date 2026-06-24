@@ -19,9 +19,11 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 
 /**
  * HTTP 工具注册服务
@@ -67,7 +69,7 @@ public class HttpToolRegistryService {
                     GenericToolCallback callback = new GenericToolCallback(
                             config.getToolName(),
                             config.getToolDescription() != null ? config.getToolDescription() : "HTTP API tool: " + config.getToolName(),
-                            config.getParamsSchema() != null ? config.getParamsSchema() : "{}",
+                            config.getParamsSchema() != null ? config.getParamsSchema() : generateDefaultRequestSchema(config),
                             (toolInput) -> {
                                 try {
                                     // 根据工具名称从数据库获取最新的配置
@@ -152,14 +154,14 @@ public class HttpToolRegistryService {
                 tool.setDescription(config.getToolDescription());
                 tool.setToolSetId(toolSet.getId());
                 tool.setType("http");
-                tool.setInputSchema(config.getParamsSchema() != null ? config.getParamsSchema() : "{}");
+                tool.setInputSchema(config.getParamsSchema() != null ? config.getParamsSchema() : generateDefaultRequestSchema(config));
                 tool.setStatus(config.getEnabled() != null && config.getEnabled() ? 1 : 0);
                 tool = toolRepository.saveAndFlush(tool);
                 logger.info("Created tool in JPA: {}", config.getToolName());
             } else {
                 // 更新工具
                 tool.setDescription(config.getToolDescription());
-                tool.setInputSchema(config.getParamsSchema() != null ? config.getParamsSchema() : "{}");
+                tool.setInputSchema(config.getParamsSchema() != null ? config.getParamsSchema() : generateDefaultRequestSchema(config));
                 tool.setStatus(config.getEnabled() != null && config.getEnabled() ? 1 : 0);
                 tool = toolRepository.saveAndFlush(tool);
                 logger.info("Updated tool in JPA: {}", config.getToolName());
@@ -179,6 +181,7 @@ public class HttpToolRegistryService {
                 httpConfig.setUrl(config.getUrlTemplate());
                 httpConfig.setHeaders(config.getHeaders());
                 httpConfig.setRequestBodyTemplate(config.getRequestBodyTemplate());
+                httpConfig.setResponseSchema(config.getResponseSchema());
                 httpConfig.setStatus(config.getEnabled() != null && config.getEnabled() ? 1 : 0);
                 httpConfig = httpToolConfigRepository.saveAndFlush(httpConfig);
                 logger.info("Created HTTP tool config in JPA: {}", config.getToolName());
@@ -189,6 +192,7 @@ public class HttpToolRegistryService {
                 httpConfig.setUrl(config.getUrlTemplate());
                 httpConfig.setHeaders(config.getHeaders());
                 httpConfig.setRequestBodyTemplate(config.getRequestBodyTemplate());
+                httpConfig.setResponseSchema(config.getResponseSchema());
                 httpConfig.setStatus(config.getEnabled() != null && config.getEnabled() ? 1 : 0);
                 httpConfig = httpToolConfigRepository.saveAndFlush(httpConfig);
                 logger.info("Updated HTTP tool config in JPA: {}", config.getToolName());
@@ -264,8 +268,131 @@ public class HttpToolRegistryService {
     }
     
     /**
+     * 根据工具名称注册HTTP工具到MCP
+     *
+     * @param config HTTP工具配置
+     * @param toolCallbackProvider 工具回调提供者
+     * @param currentToolNames 当前已注册的工具名称集合
+     * @param executorService 执行器服务
+     * @return 是否注册成功
+     */
+    public boolean registerHttpToolToMcp(HttpToolConfig config, CustomToolCallbackProvider toolCallbackProvider,
+                                         Set<String> currentToolNames, HttpToolExecutorService executorService) {
+        if (toolCallbackProvider == null || config == null) {
+            return false;
+        }
+        try {
+            String toolName = config.getToolName();
+            if (currentToolNames != null && currentToolNames.contains(toolName)) {
+                logger.info("HTTP tool already registered in MCP: {}", toolName);
+                return true;
+            }
+
+            String inputSchema = config.getParamsSchema() != null ? config.getParamsSchema() : generateDefaultRequestSchema(config);
+
+            GenericToolCallback callback = new GenericToolCallback(
+                    toolName,
+                    config.getToolDescription() != null ? config.getToolDescription() : "HTTP API tool: " + toolName,
+                    inputSchema,
+                    (toolInput) -> {
+                        try {
+                            HttpToolConfig latestConfig = SqliteDBManager.findByToolName(toolName);
+                            if (latestConfig == null) {
+                                Map<String, Object> errorResult = new HashMap<>();
+                                errorResult.put("success", false);
+                                errorResult.put("error", "Tool configuration not found: " + toolName);
+                                return new ObjectMapper().writeValueAsString(errorResult);
+                            }
+                            if (latestConfig.getEnabled() != null && !latestConfig.getEnabled()) {
+                                Map<String, Object> errorResult = new HashMap<>();
+                                errorResult.put("success", false);
+                                errorResult.put("error", "Tool is disabled: " + toolName);
+                                return new ObjectMapper().writeValueAsString(errorResult);
+                            }
+                            return executorService.executeToolCall(latestConfig, toolInput);
+                        } catch (Exception e) {
+                            Map<String, Object> errorResult = new HashMap<>();
+                            errorResult.put("success", false);
+                            errorResult.put("error", "Error executing tool: " + e.getMessage());
+                            try {
+                                return new ObjectMapper().writeValueAsString(errorResult);
+                            } catch (JsonProcessingException jsonException) {
+                                return "{\"success\": false, \"error\": \"Internal error occurred\"}";
+                            }
+                        }
+                    }
+            );
+
+            toolCallbackProvider.addTools(callback);
+            if (currentToolNames != null) {
+                currentToolNames.add(toolName);
+            }
+            logger.info("Registered HTTP tool to MCP: {}", toolName);
+            return true;
+        } catch (Exception e) {
+            logger.error("Failed to register HTTP tool to MCP: {}", config.getToolName(), e);
+            return false;
+        }
+    }
+
+    /**
+     * 生成默认的请求参数JSON Schema
+     *
+     * @param config HTTP工具配置
+     * @return 生成的JSON Schema字符串
+     */
+    public static String generateDefaultRequestSchema(HttpToolConfig config) {
+        try {
+            ObjectMapper objectMapper = new ObjectMapper();
+            Map<String, Object> schema = new HashMap<>();
+            schema.put("type", "object");
+            Map<String, Object> properties = new LinkedHashMap<>();
+            List<String> required = new ArrayList<>();
+
+            // 从URL模板中提取路径参数 {paramName}
+            String urlTemplate = config.getUrlTemplate();
+            if (urlTemplate != null && !urlTemplate.isEmpty()) {
+                java.util.regex.Pattern pathPattern = java.util.regex.Pattern.compile("\\{(\\w+)\\}");
+                java.util.regex.Matcher pathMatcher = pathPattern.matcher(urlTemplate);
+                while (pathMatcher.find()) {
+                    String paramName = pathMatcher.group(1);
+                    Map<String, Object> paramSchema = new HashMap<>();
+                    paramSchema.put("type", "string");
+                    paramSchema.put("description", "URL path parameter: " + paramName);
+                    properties.put(paramName, paramSchema);
+                }
+            }
+
+            // 从请求体模板中提取变量 ${variable}
+            String bodyTemplate = config.getRequestBodyTemplate();
+            if (bodyTemplate != null && !bodyTemplate.isEmpty()) {
+                java.util.regex.Pattern bodyPattern = java.util.regex.Pattern.compile("\\$\\{(\\w+)\\}");
+                java.util.regex.Matcher bodyMatcher = bodyPattern.matcher(bodyTemplate);
+                while (bodyMatcher.find()) {
+                    String varName = bodyMatcher.group(1);
+                    if (!properties.containsKey(varName)) {
+                        Map<String, Object> varSchema = new HashMap<>();
+                        varSchema.put("type", "string");
+                        varSchema.put("description", "Request body variable: " + varName);
+                        properties.put(varName, varSchema);
+                    }
+                }
+            }
+
+            schema.put("properties", properties);
+            if (!required.isEmpty()) {
+                schema.put("required", required);
+            }
+
+            return objectMapper.writeValueAsString(schema);
+        } catch (Exception e) {
+            return "{\"type\": \"object\", \"properties\": {}}";
+        }
+    }
+
+    /**
      * 查询所有启用的工具配置
-     * 
+     *
      * @return 启用的工具配置列表
      */
     public List<HttpToolConfig> findAllEnabled() {

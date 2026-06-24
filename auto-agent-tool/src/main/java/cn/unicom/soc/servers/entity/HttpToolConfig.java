@@ -40,7 +40,10 @@ public class HttpToolConfig {
     
     @Column(name = "params_schema", columnDefinition = "TEXT")
     private String paramsSchema;
-    
+
+    @Column(name = "response_schema", columnDefinition = "TEXT")
+    private String responseSchema;
+
     @Column(name = "auth_type", length = 50)
     private String authType;
     
@@ -129,6 +132,14 @@ public class HttpToolConfig {
         this.paramsSchema = paramsSchema;
     }
 
+    public String getResponseSchema() {
+        return responseSchema;
+    }
+
+    public void setResponseSchema(String responseSchema) {
+        this.responseSchema = responseSchema;
+    }
+
     public String getAuthType() {
         return authType;
     }
@@ -188,6 +199,7 @@ public class HttpToolConfig {
                 ", headers='" + headers + '\'' +
                 ", requestBodyTemplate='" + requestBodyTemplate + '\'' +
                 ", paramsSchema='" + paramsSchema + '\'' +
+                ", responseSchema='" + responseSchema + '\'' +
                 ", authType='" + authType + '\'' +
                 ", authConfig='" + authConfig + '\'' +
                 ", timeoutMs=" + timeoutMs +

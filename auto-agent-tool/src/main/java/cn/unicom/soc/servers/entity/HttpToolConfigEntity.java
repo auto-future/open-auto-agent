@@ -43,7 +43,10 @@ public class HttpToolConfigEntity {
     
     @Column(name = "response_parsing_pattern", columnDefinition = "TEXT")
     private String responseParsingPattern;
-    
+
+    @Column(name = "response_schema", columnDefinition = "TEXT")
+    private String responseSchema;
+
     @Column(name = "status", nullable = false)
     private Integer status = 1; // 0-禁用, 1-启用
     

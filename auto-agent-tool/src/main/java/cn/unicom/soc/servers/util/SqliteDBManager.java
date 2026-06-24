@@ -13,8 +13,8 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * SQLite 单文件数据库管理器
- * 负责 HTTP 工具配置的持久化存储
+ * SQLite 鍗曟枃浠舵暟鎹�簱绠＄悊鍣?
+ * 璐熻矗 HTTP 宸ュ叿閰嶇疆鐨勬寔涔呭寲瀛樺偍
  */
 @Component
 public class SqliteDBManager {
@@ -28,14 +28,14 @@ public class SqliteDBManager {
     private static volatile boolean initialized = false;
 
     /**
-     * 设置数据库路径（用于命令行工具等非 Spring 环境）
+     * 璁剧疆鏁版嵁搴撹矾寰勶紙鐢ㄤ簬鍛戒护琛屽伐鍏风瓑闈?Spring 鐜��锛?
      */
     public static synchronized void setDbPath(String path) {
         if (path == null || path.isEmpty()) {
             throw new IllegalArgumentException("Database path cannot be null or empty");
         }
         staticDbPath = path;
-        initialized = false; // 强制下次 getConnection 时重新初始化
+        initialized = false; // 寮哄埗涓嬫� getConnection 鏃堕噸鏂板垵濮嬪寲
         logger.info("SQLite database path set to: {}", staticDbPath);
     }
 
@@ -48,7 +48,7 @@ public class SqliteDBManager {
     }
 
     /**
-     * 确保数据目录存在
+     * 纭�繚鏁版嵁鐩�綍瀛樺湪
      */
     private static void ensureDataDirectoryExists() {
         File dbFile = new File(staticDbPath);
@@ -59,7 +59,7 @@ public class SqliteDBManager {
     }
 
     /**
-     * 懒加载初始化检查
+     * 鎳掑姞杞藉垵濮嬪寲妫€鏌?
      */
     private static synchronized void ensureInitialized() {
         if (!initialized) {
@@ -74,7 +74,7 @@ public class SqliteDBManager {
     }
 
     /**
-     * 获取数据库连接
+     * 鑾峰彇鏁版嵁搴撹繛鎺?
      */
     public static Connection getConnection() throws SQLException {
         ensureInitialized();
@@ -82,7 +82,7 @@ public class SqliteDBManager {
     }
 
     /**
-     * 初始化数据库表结构
+     * 鍒濆�鍖栨暟鎹�簱琛ㄧ粨鏋?
      */
     public static void initializeDatabase() {
         String createTableSql = "CREATE TABLE IF NOT EXISTS http_tools (" +
@@ -94,6 +94,7 @@ public class SqliteDBManager {
                 "headers TEXT," +
                 "request_body_template TEXT," +
                 "params_schema TEXT," +
+                "response_schema TEXT," +
                 "auth_type VARCHAR(50)," +
                 "auth_config TEXT," +
                 "timeout_ms INTEGER DEFAULT 30000," +
@@ -116,17 +117,17 @@ public class SqliteDBManager {
     }
 
     /**
-     * 插入或更新 HTTP 工具配置
+     * 鎻掑叆鎴栨洿鏂?HTTP 宸ュ叿閰嶇疆
      */
     public static int saveOrUpdate(HttpToolConfig config) {
         String sql = "INSERT INTO http_tools (tool_name, tool_description, http_method, url_template, headers, " +
-                "request_body_template, params_schema, auth_type, auth_config, timeout_ms, enabled, updated_at) " +
-                "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP) " +
+                "request_body_template, params_schema, response_schema, auth_type, auth_config, timeout_ms, enabled, updated_at) " +
+                "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP) " +
                 "ON CONFLICT(tool_name) DO UPDATE SET " +
                 "tool_description=excluded.tool_description, http_method=excluded.http_method, " +
                 "url_template=excluded.url_template, headers=excluded.headers, " +
                 "request_body_template=excluded.request_body_template, params_schema=excluded.params_schema, " +
-                "auth_type=excluded.auth_type, auth_config=excluded.auth_config, " +
+                "response_schema=excluded.response_schema, auth_type=excluded.auth_type, auth_config=excluded.auth_config, " +
                 "timeout_ms=excluded.timeout_ms, enabled=excluded.enabled, updated_at=CURRENT_TIMESTAMP";
 
         try (Connection conn = getConnection();
@@ -138,10 +139,11 @@ public class SqliteDBManager {
             pstmt.setString(5, config.getHeaders());
             pstmt.setString(6, config.getRequestBodyTemplate());
             pstmt.setString(7, config.getParamsSchema());
-            pstmt.setString(8, config.getAuthType());
-            pstmt.setString(9, config.getAuthConfig());
-            pstmt.setInt(10, config.getTimeoutMs() != null ? config.getTimeoutMs() : 30000);
-            pstmt.setBoolean(11, config.getEnabled() != null ? config.getEnabled() : true);
+            pstmt.setString(8, config.getResponseSchema());
+            pstmt.setString(9, config.getAuthType());
+            pstmt.setString(10, config.getAuthConfig());
+            pstmt.setInt(11, config.getTimeoutMs() != null ? config.getTimeoutMs() : 30000);
+            pstmt.setBoolean(12, config.getEnabled() != null ? config.getEnabled() : true);
 
             pstmt.executeUpdate();
 
@@ -158,7 +160,7 @@ public class SqliteDBManager {
     }
 
     /**
-     * 根据 ID 查询 HTTP 工具配置
+     * 鏍规嵁 ID 鏌ヨ� HTTP 宸ュ叿閰嶇疆
      */
     public static HttpToolConfig findById(int id) {
         String sql = "SELECT * FROM http_tools WHERE id = ?";
@@ -177,7 +179,7 @@ public class SqliteDBManager {
     }
 
     /**
-     * 根据工具名称查询 HTTP 工具配置
+     * 鏍规嵁宸ュ叿鍚嶇О鏌ヨ� HTTP 宸ュ叿閰嶇疆
      */
     public static HttpToolConfig findByToolName(String toolName) {
         String sql = "SELECT * FROM http_tools WHERE tool_name = ?";
@@ -196,7 +198,7 @@ public class SqliteDBManager {
     }
 
     /**
-     * 查询所有启用的 HTTP 工具配置
+     * 鏌ヨ�鎵€鏈夊惎鐢ㄧ殑 HTTP 宸ュ叿閰嶇疆
      */
     public static List<HttpToolConfig> findAllEnabled() {
         List<HttpToolConfig> configs = new ArrayList<>();
@@ -214,7 +216,7 @@ public class SqliteDBManager {
     }
 
     /**
-     * 查询所有 HTTP 工具配置
+     * 鏌ヨ�鎵€鏈?HTTP 宸ュ叿閰嶇疆
      */
     public static List<HttpToolConfig> findAll() {
         List<HttpToolConfig> configs = new ArrayList<>();
@@ -232,7 +234,7 @@ public class SqliteDBManager {
     }
 
     /**
-     * 删除指定 ID 的 HTTP 工具配置
+     * 鍒犻櫎鎸囧畾 ID 鐨?HTTP 宸ュ叿閰嶇疆
      */
     public static boolean deleteById(int id) {
         String sql = "DELETE FROM http_tools WHERE id = ?";
@@ -247,7 +249,7 @@ public class SqliteDBManager {
     }
 
     /**
-     * 删除指定名称的 HTTP 工具配置
+     * 鍒犻櫎鎸囧畾鍚嶇О鐨?HTTP 宸ュ叿閰嶇疆
      */
     public static boolean deleteByName(String toolName) {
         String sql = "DELETE FROM http_tools WHERE tool_name = ?";
@@ -262,11 +264,11 @@ public class SqliteDBManager {
     }
 
     /**
-     * 更新 HTTP 工具的启用状态（按名称）
+     * 鏇存柊 HTTP 宸ュ叿鐨勫惎鐢ㄧ姸鎬侊紙鎸夊悕绉帮級
      *
-     * @param toolName 工具名称
-     * @param enabled  启用状态
-     * @return 是否更新成功
+     * @param toolName 宸ュ叿鍚嶇О
+     * @param enabled  鍚�敤鐘舵€?
+     * @return 鏄�惁鏇存柊鎴愬姛
      */
     public static boolean updateEnabledStatus(String toolName, boolean enabled) {
         String sql = "UPDATE http_tools SET enabled = ?, updated_at = CURRENT_TIMESTAMP WHERE tool_name = ?";
@@ -283,11 +285,11 @@ public class SqliteDBManager {
     }
 
     /**
-     * 更新 HTTP 工具的启用状态（按ID）
+     * 鏇存柊 HTTP 宸ュ叿鐨勫惎鐢ㄧ姸鎬侊紙鎸塈D锛?
      *
-     * @param id      工具ID
-     * @param enabled 启用状态
-     * @return 是否更新成功
+     * @param id      宸ュ叿ID
+     * @param enabled 鍚�敤鐘舵€?
+     * @return 鏄�惁鏇存柊鎴愬姛
      */
     public static boolean updateEnabledStatusById(int id, boolean enabled) {
         String sql = "UPDATE http_tools SET enabled = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?";
@@ -304,7 +306,7 @@ public class SqliteDBManager {
     }
 
     /**
-     * 将 ResultSet 映射为 HttpToolConfig 对象
+     * 灏?ResultSet 鏄犲皠涓?HttpToolConfig 瀵硅薄
      */
     private static HttpToolConfig mapResultSetToConfig(ResultSet rs) throws SQLException {
         HttpToolConfig config = new HttpToolConfig();
@@ -316,6 +318,7 @@ public class SqliteDBManager {
         config.setHeaders(rs.getString("headers"));
         config.setRequestBodyTemplate(rs.getString("request_body_template"));
         config.setParamsSchema(rs.getString("params_schema"));
+        config.setResponseSchema(rs.getString("response_schema"));
         config.setAuthType(rs.getString("auth_type"));
         config.setAuthConfig(rs.getString("auth_config"));
         config.setTimeoutMs(rs.getInt("timeout_ms"));
