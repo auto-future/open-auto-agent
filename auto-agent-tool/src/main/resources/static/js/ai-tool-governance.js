@@ -38,7 +38,8 @@ function switchPage(page) {
         'tools': '工具管理',
         'models': '大模型管理',
         'ai-assistant': '智能工具测试',
-        'http-test': 'HTTP接口测试'
+        'http-test': 'HTTP接口测试',
+        'http-api-manager': 'HTTP API管理'
     };
     document.getElementById('pageTitle').textContent = titles[page] || page;
     
@@ -69,6 +70,7 @@ function refreshCurrentPage() {
         case 'sets': loadSets(); break;
         case 'tools': loadTools(); break;
         case 'models': loadModels(); break;
+        case 'http-api-manager': loadHttpApis(); break;
     }
     
     showToast('刷新成功', 'success');
@@ -1515,7 +1517,7 @@ async function generateParamsWithAI() {
     }
 }
 
-async function callLLMAPI(model, prompt) {
+async function callLLMAPI(model, prompt, systemPrompt) {
     const response = await fetch(model.apiEndpoint, {
         method: 'POST',
         headers: {
@@ -1525,7 +1527,7 @@ async function callLLMAPI(model, prompt) {
         body: JSON.stringify({
             model: model.modelId,
             messages: [
-                {role: 'system', content: '你是一个API测试专家，根据JSON Schema生成测试数据。返回纯JSON格式。'},
+                {role: 'system', content: systemPrompt || '你是一个API测试专家，根据JSON Schema生成测试数据。返回纯JSON格式。'},
                 {role: 'user', content: prompt}
             ],
             temperature: model.temperature || 0.7,
@@ -1735,4 +1737,404 @@ function showToast(message, type = 'info') {
     const toast = new bootstrap.Toast(toastEl, {delay: 3000});
     toast.show();
     toastEl.addEventListener('hidden.bs.toast', () => toastEl.remove());
+}
+
+// ==================== HTTP API管理 ====================
+
+const HTTP_API_BASE = '/api/http-tools';
+
+async function loadHttpApis() {
+    const container = document.getElementById('httpApisContainer');
+    if (!container) return;
+
+    try {
+        const res = await fetch(HTTP_API_BASE);
+        const data = await res.json();
+        if (data.success) {
+            renderHttpApis(data.apis || []);
+        } else {
+            container.innerHTML = `<div class="alert alert-danger">加载失败: ${data.error || '未知错误'}</div>`;
+        }
+    } catch (e) {
+        container.innerHTML = `<div class="alert alert-danger">加载失败: ${e.message}</div>`;
+    }
+}
+
+function renderHttpApis(apis) {
+    const container = document.getElementById('httpApisContainer');
+    const methodFilter = document.getElementById('filterHttpApiMethod')?.value || '';
+    const statusFilter = document.getElementById('filterHttpApiStatus')?.value || '';
+    const searchText = document.getElementById('searchHttpApiName')?.value?.toLowerCase() || '';
+
+    let filtered = apis;
+    if (methodFilter) filtered = filtered.filter(a => a.httpMethod === methodFilter);
+    if (statusFilter !== '') filtered = filtered.filter(a => (a.enabled ? '1' : '0') === statusFilter);
+    if (searchText) filtered = filtered.filter(a =>
+        (a.toolName || '').toLowerCase().includes(searchText) ||
+        (a.urlTemplate || '').toLowerCase().includes(searchText)
+    );
+
+    if (filtered.length === 0) {
+        container.innerHTML = `
+            <div class="col-12">
+                <div class="empty-state" style="padding: 60px;">
+                    <div class="empty-icon">🛠️</div>
+                    <div class="empty-title">暂无HTTP API</div>
+                    <div class="empty-text">点击右上角按钮新增HTTP API</div>
+                </div>
+            </div>
+        `;
+        return;
+    }
+
+    const methodColors = {
+        'GET': 'bg-success',
+        'POST': 'bg-primary',
+        'PUT': 'bg-warning text-dark',
+        'DELETE': 'bg-danger',
+        'PATCH': 'bg-info'
+    };
+
+    container.innerHTML = filtered.map(api => `
+        <div class="col-md-6 col-lg-4">
+            <div class="card h-100">
+                <div class="card-header bg-white d-flex justify-content-between align-items-center">
+                    <div class="d-flex align-items-center gap-2">
+                        <span class="badge ${methodColors[api.httpMethod] || 'bg-secondary'}">${api.httpMethod || 'GET'}</span>
+                        <span class="fw-semibold text-truncate" style="max-width: 180px;" title="${api.toolName || ''}">${api.toolName || '未命名'}</span>
+                    </div>
+                    <div class="form-check form-switch">
+                        <input class="form-check-input" type="checkbox" ${api.enabled ? 'checked' : ''}
+                            onchange="toggleHttpApi(${api.id}, this.checked)">
+                    </div>
+                </div>
+                <div class="card-body">
+                    <div class="text-muted small mb-2 text-truncate" title="${api.urlTemplate || ''}">${api.urlTemplate || '-'}</div>
+                    <div class="text-muted small mb-3" style="height: 40px; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;">
+                        ${api.toolDescription || '无描述'}
+                    </div>
+                    <div class="d-flex gap-2 flex-wrap">
+                        ${api.paramsSchema ? '<span class="badge bg-light text-dark border">请求Schema</span>' : ''}
+                        ${api.responseSchema ? '<span class="badge bg-light text-dark border">响应Schema</span>' : ''}
+                        ${api.authType && api.authType !== 'none' ? `<span class="badge bg-light text-dark border">${api.authType}</span>` : ''}
+                    </div>
+                </div>
+                <div class="card-footer bg-white d-flex justify-content-end gap-2">
+                    <button class="btn btn-sm btn-outline-primary" onclick='openHttpApiModal(${JSON.stringify(api).replace(/'/g, "&#39;")})'>编辑</button>
+                    <button class="btn btn-sm btn-outline-danger" onclick="deleteHttpApi(${api.id})">删除</button>
+                </div>
+            </div>
+        </div>
+    `).join('');
+}
+
+function openHttpApiModal(api) {
+    const isEdit = !!api;
+    const modalTitle = isEdit ? '编辑HTTP API' : '新增HTTP API';
+
+    const content = `
+        <form id="httpApiForm">
+            <input type="hidden" id="httpApiId" value="${isEdit ? api.id : ''}">
+            <div class="row g-3">
+                <div class="col-md-6">
+                    <label class="form-label">API名称 <span class="text-danger">*</span></label>
+                    <input type="text" class="form-control" id="httpApiToolName" value="${isEdit ? (api.toolName || '') : ''}" required>
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label">HTTP方法 <span class="text-danger">*</span></label>
+                    <select class="form-select" id="httpApiMethod">
+                        <option value="GET" ${isEdit && api.httpMethod === 'GET' ? 'selected' : ''}>GET</option>
+                        <option value="POST" ${isEdit && api.httpMethod === 'POST' ? 'selected' : ''}>POST</option>
+                        <option value="PUT" ${isEdit && api.httpMethod === 'PUT' ? 'selected' : ''}>PUT</option>
+                        <option value="DELETE" ${isEdit && api.httpMethod === 'DELETE' ? 'selected' : ''}>DELETE</option>
+                        <option value="PATCH" ${isEdit && api.httpMethod === 'PATCH' ? 'selected' : ''}>PATCH</option>
+                    </select>
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label">超时(ms)</label>
+                    <input type="number" class="form-control" id="httpApiTimeout" value="${isEdit ? (api.timeoutMs || 30000) : 30000}">
+                </div>
+                <div class="col-12">
+                    <label class="form-label">URL模板 <span class="text-danger">*</span></label>
+                    <input type="text" class="form-control" id="httpApiUrl" value="${isEdit ? (api.urlTemplate || '') : ''}" placeholder="https://api.example.com/users/{id}" required>
+                </div>
+                <div class="col-12">
+                    <label class="form-label">描述</label>
+                    <input type="text" class="form-control" id="httpApiDesc" value="${isEdit ? (api.toolDescription || '') : ''}">
+                </div>
+                <div class="col-md-6">
+                    <label class="form-label">认证类型</label>
+                    <select class="form-select" id="httpApiAuthType">
+                        <option value="none" ${isEdit && api.authType === 'none' ? 'selected' : ''}>无认证</option>
+                        <option value="bearer" ${isEdit && api.authType === 'bearer' ? 'selected' : ''}>Bearer Token</option>
+                        <option value="basic" ${isEdit && api.authType === 'basic' ? 'selected' : ''}>Basic Auth</option>
+                        <option value="apikey" ${isEdit && api.authType === 'apikey' ? 'selected' : ''}>API Key</option>
+                    </select>
+                </div>
+                <div class="col-md-6 d-flex align-items-end">
+                    <div class="form-check">
+                        <input class="form-check-input" type="checkbox" id="httpApiEnabled" ${isEdit ? (api.enabled ? 'checked' : '') : 'checked'}>
+                        <label class="form-check-label" for="httpApiEnabled">启用</label>
+                    </div>
+                </div>
+                <div class="col-12">
+                    <label class="form-label">请求头 (JSON)</label>
+                    <textarea class="form-control font-monospace" id="httpApiHeaders" rows="3" placeholder='{"Content-Type": "application/json"}'>${isEdit ? (api.headers || '') : ''}</textarea>
+                </div>
+                <div class="col-12">
+                    <label class="form-label">请求体模板</label>
+                    <textarea class="form-control font-monospace" id="httpApiBodyTemplate" rows="3" placeholder='{"name": "${name}"}'>${isEdit ? (api.requestBodyTemplate || '') : ''}</textarea>
+                </div>
+                <div class="col-12">
+                    <label class="form-label">请求参数JSON Schema</label>
+                    <textarea class="form-control font-monospace" id="httpApiParamsSchema" rows="4" placeholder='{"type": "object", "properties": {"id": {"type": "string"}}}'>${isEdit ? (api.paramsSchema || '') : ''}</textarea>
+                    <div class="form-text text-muted">留空将根据URL模板和请求体模板自动生成</div>
+                </div>
+                <div class="col-12">
+                    <label class="form-label">响应结果JSON Schema</label>
+                    <textarea class="form-control font-monospace" id="httpApiResponseSchema" rows="4" placeholder='{"type": "object", "properties": {"data": {"type": "object"}}}'>${isEdit ? (api.responseSchema || '') : ''}</textarea>
+                </div>
+            </div>
+        </form>
+    `;
+
+    createModal({title: modalTitle, content: content, onConfirm: () => saveHttpApi(), size: 'lg'});
+}
+
+async function saveHttpApi() {
+    const id = document.getElementById('httpApiId').value;
+    const payload = {
+        toolName: document.getElementById('httpApiToolName').value.trim(),
+        httpMethod: document.getElementById('httpApiMethod').value,
+        urlTemplate: document.getElementById('httpApiUrl').value.trim(),
+        toolDescription: document.getElementById('httpApiDesc').value.trim(),
+        headers: document.getElementById('httpApiHeaders').value.trim(),
+        requestBodyTemplate: document.getElementById('httpApiBodyTemplate').value.trim(),
+        paramsSchema: document.getElementById('httpApiParamsSchema').value.trim(),
+        responseSchema: document.getElementById('httpApiResponseSchema').value.trim(),
+        authType: document.getElementById('httpApiAuthType').value,
+
+        timeoutMs: parseInt(document.getElementById('httpApiTimeout').value) || 30000,
+        enabled: document.getElementById('httpApiEnabled').checked
+    };
+
+    if (!payload.toolName || !payload.httpMethod || !payload.urlTemplate) {
+        showToast('请填写必填项', 'warning');
+        return;
+    }
+
+    try {
+        const res = await fetch(HTTP_API_BASE, {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify(payload)
+        });
+        const data = await res.json();
+        if (data.success) {
+            closeModal();
+            showToast(id ? '更新成功' : '新增成功', 'success');
+            loadHttpApis();
+        } else {
+            showToast(data.error || data.message || '操作失败', 'error');
+        }
+    } catch (e) {
+        showToast('操作失败: ' + e.message, 'error');
+    }
+}
+
+async function deleteHttpApi(id) {
+    if (!confirm('确定要删除此HTTP API吗？')) return;
+
+    try {
+        const res = await fetch(`${HTTP_API_BASE}/${id}`, {method: 'DELETE'});
+        const data = await res.json();
+        if (data.success) {
+            showToast('删除成功', 'success');
+            loadHttpApis();
+        } else {
+            showToast(data.error || data.message || '删除失败', 'error');
+        }
+    } catch (e) {
+        showToast('删除失败: ' + e.message, 'error');
+    }
+}
+
+async function toggleHttpApi(id, enabled) {
+    try {
+        const res = await fetch(`${HTTP_API_BASE}/${id}/${enabled ? 'enable' : 'disable'}`, {method: 'PUT'});
+        const data = await res.json();
+        if (data.success) {
+            showToast(enabled ? '已启用' : '已禁用', 'success');
+            loadHttpApis();
+        } else {
+            showToast(data.error || data.message || '操作失败', 'error');
+            loadHttpApis();
+        }
+    } catch (e) {
+        showToast('操作失败: ' + e.message, 'error');
+        loadHttpApis();
+    }
+}
+
+async function refreshMcpTools() {
+    try {
+        const res = await fetch(`${HTTP_API_BASE}/refresh`, {method: 'POST'});
+        const data = await res.json();
+        if (data.success) {
+            showToast(`MCP工具刷新成功，共${data.registered || 0}个`, 'success');
+        } else {
+            showToast(data.error || '刷新失败', 'error');
+        }
+    } catch (e) {
+        showToast('刷新失败: ' + e.message, 'error');
+    }
+}
+
+// ==================== AI生成HTTP API ====================
+
+function openAIGenerateHttpApiModal() {
+    const models = JSON.parse(localStorage.getItem(MODELS_STORAGE_KEY) || '[]');
+    const modelOptions = models.length > 0
+        ? models.map(m => `<option value="${m.id}">${m.name}</option>`).join('')
+        : '<option value="">请先配置大模型</option>';
+
+    const content = `
+        <form id="aiGenerateForm">
+            <div class="mb-3">
+                <label class="form-label">选择大模型 <span class="text-danger">*</span></label>
+                <select class="form-select" id="aiGenModelSelect">
+                    <option value="">请选择模型</option>
+                    ${modelOptions}
+                </select>
+            </div>
+            <div class="mb-3">
+                <label class="form-label">接口描述 <span class="text-danger">*</span></label>
+                <textarea class="form-control" id="aiGenDescription" rows="6" placeholder="请描述接口功能，例如：\n接口名称：获取用户信息\nURL：https://api.example.com/users/{id}\n方法：GET\n功能：根据用户ID查询用户详情\n请求参数：id(路径参数, string)\n响应：用户对象，包含id、name、email等字段"></textarea>
+                <div class="form-text text-muted">描述越详细，生成结果越准确</div>
+            </div>
+            <div id="aiGenResultContainer"></div>
+        </form>
+    `;
+
+    createModal({
+        title: 'AI生成HTTP API',
+        content: content,
+        onConfirm: () => generateHttpApiWithAI(),
+        size: 'lg'
+    });
+}
+
+async function generateHttpApiWithAI() {
+    const modelId = document.getElementById('aiGenModelSelect').value;
+    const description = document.getElementById('aiGenDescription').value.trim();
+    const container = document.getElementById('aiGenResultContainer');
+
+    if (!modelId) { showToast('请先选择大模型', 'warning'); return; }
+    if (!description) { showToast('请输入接口描述', 'warning'); return; }
+
+    const models = JSON.parse(localStorage.getItem(MODELS_STORAGE_KEY) || '[]');
+    const model = models.find(m => m.id === modelId);
+    if (!model) { showToast('找不到模型配置', 'error'); return; }
+
+    container.innerHTML = `
+        <div style="padding: 20px; text-align: center;">
+            <div class="spinner-border text-primary" role="status" style="margin-bottom: 12px;">
+                <span class="visually-hidden">Loading...</span>
+            </div>
+            <div class="text-muted">AI正在生成HTTP API配置...</div>
+        </div>
+    `;
+
+    try {
+        const prompt = buildHttpApiAIPrompt(description);
+        const systemPrompt = '你是一个API设计专家，根据接口描述生成完整的HTTP API配置信息。请只返回纯JSON对象，不要有任何解释或markdown代码块。';
+        const aiResponse = await callLLMAPI(model, prompt, systemPrompt);
+        const result = parseAIResponse(aiResponse);
+
+        if (!result.toolName || !result.httpMethod || !result.urlTemplate) {
+            throw new Error('AI生成结果缺少必要字段(toolName/httpMethod/urlTemplate)');
+        }
+
+        window._lastGeneratedHttpApi = result;
+
+        container.innerHTML = `
+            <div style="padding: 12px; background: #f6ffed; border-radius: 6px; border-left: 3px solid #52c41a; margin-top: 16px;">
+                <div style="font-weight: 600; color: #389e0d;">✅ 生成成功</div>
+            </div>
+            <pre style="padding: 12px; background: #fafafa; border-radius: 6px; overflow-x: auto; font-size: 12px; margin-top: 12px; border: 1px solid #f0f0f0; max-height: 300px;">${JSON.stringify(result, null, 2)}</pre>
+            <div style="display: flex; gap: 8px; justify-content: flex-end; margin-top: 12px;">
+                <button class="btn btn-outline-secondary" onclick="copyAIGeneratedResult()">📋 复制</button>
+                <button class="btn btn-primary" onclick="applyGeneratedHttpApiToForm()">📝 应用到表单</button>
+            </div>
+        `;
+        showToast('HTTP API生成成功', 'success');
+    } catch (error) {
+        container.innerHTML = `
+            <div style="padding: 12px; background: #fff1f0; border-radius: 6px; border-left: 3px solid #ff4d4f; margin-top: 16px;">
+                <div style="font-weight: 600; color: #cf1322;">❌ 生成失败</div>
+                <div style="font-size: 12px; color: #595959; margin-top: 4px;">${error.message}</div>
+            </div>
+        `;
+        showToast('生成失败: ' + error.message, 'error');
+    }
+}
+
+function buildHttpApiAIPrompt(description) {
+    return `请根据以下接口描述，生成完整的HTTP API配置信息。
+
+接口描述：
+${description}
+
+要求生成以下JSON字段：
+- toolName: API英文名称（驼峰命名，用于MCP工具名，如 getUserInfo）
+- httpMethod: HTTP方法（GET/POST/PUT/DELETE/PATCH）
+- urlTemplate: URL模板，路径参数用{paramName}表示，如 https://api.example.com/users/{id}
+- toolDescription: API中文描述
+- headers: 请求头JSON对象，如 {"Content-Type": "application/json"}
+- requestBodyTemplate: 请求体模板，变量用\${varName}表示，如 {"name": "\${name}"}
+- paramsSchema: 请求参数JSON Schema，包含路径参数、查询参数、请求体参数
+- responseSchema: 响应结果JSON Schema
+
+请只返回纯JSON对象，不要有任何解释或markdown代码块。`;
+}
+
+function applyGeneratedHttpApiToForm() {
+    const result = window._lastGeneratedHttpApi;
+    if (!result) { showToast('没有可应用的生成结果', 'warning'); return; }
+
+    closeModal();
+
+    setTimeout(() => {
+        openHttpApiModal(null);
+
+        setTimeout(() => {
+            if (result.toolName) document.getElementById('httpApiToolName').value = result.toolName;
+            if (result.httpMethod) document.getElementById('httpApiMethod').value = result.httpMethod.toUpperCase();
+            if (result.urlTemplate) document.getElementById('httpApiUrl').value = result.urlTemplate;
+            if (result.toolDescription) document.getElementById('httpApiDesc').value = result.toolDescription;
+            if (result.headers) {
+                const headers = typeof result.headers === 'string' ? result.headers : JSON.stringify(result.headers, null, 2);
+                document.getElementById('httpApiHeaders').value = headers;
+            }
+            if (result.requestBodyTemplate) document.getElementById('httpApiBodyTemplate').value = result.requestBodyTemplate;
+            if (result.paramsSchema) {
+                const schema = typeof result.paramsSchema === 'string' ? result.paramsSchema : JSON.stringify(result.paramsSchema, null, 2);
+                document.getElementById('httpApiParamsSchema').value = schema;
+            }
+            if (result.responseSchema) {
+                const schema = typeof result.responseSchema === 'string' ? result.responseSchema : JSON.stringify(result.responseSchema, null, 2);
+                document.getElementById('httpApiResponseSchema').value = schema;
+            }
+            if (result.authType) document.getElementById('httpApiAuthType').value = result.authType;
+            if (result.timeoutMs) document.getElementById('httpApiTimeout').value = result.timeoutMs;
+            showToast('已填充到表单，请检查并保存', 'success');
+        }, 300);
+    }, 200);
+}
+
+function copyAIGeneratedResult() {
+    const pre = document.querySelector('#aiGenResultContainer pre');
+    if (pre) {
+        navigator.clipboard.writeText(pre.textContent).then(() => showToast('已复制', 'success'));
+    }
 }

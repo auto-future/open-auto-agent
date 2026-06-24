@@ -162,6 +162,93 @@ public class HttpToolController {
     }
 
     /**
+     * 刷新MCP工具列表
+     */
+    @PostMapping("/refresh")
+    public ResponseEntity<String> refreshMcpTools() {
+        try {
+            String result = httpApiManagerService.refreshMcpTools();
+            return ResponseEntity.ok(result);
+        } catch (Exception e) {
+            Map<String, Object> errorResult = new HashMap<>();
+            errorResult.put("success", false);
+            errorResult.put("error", e.getMessage());
+
+            try {
+                return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                        .body(objectMapper.writeValueAsString(errorResult));
+            } catch (JsonProcessingException jsonException) {
+                return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                        .body("{\"success\": false, \"error\": \"Internal error occurred\"}");
+            }
+        }
+    }
+
+    /**
+     * 启用 HTTP 工具
+     */
+    @PutMapping("/{id}/enable")
+    public ResponseEntity<String> enableHttpTool(@PathVariable int id) {
+        try {
+            Map<String, Object> params = new HashMap<>();
+            params.put("id", id);
+
+            String result = httpApiManagerService.enableHttpApi(params);
+
+            Map<String, Object> resultMap = objectMapper.readValue(result, Map.class);
+            if ((Boolean) resultMap.get("success")) {
+                return ResponseEntity.ok(result);
+            } else {
+                return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(result);
+            }
+        } catch (Exception e) {
+            Map<String, Object> errorResult = new HashMap<>();
+            errorResult.put("success", false);
+            errorResult.put("error", e.getMessage());
+
+            try {
+                return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                        .body(objectMapper.writeValueAsString(errorResult));
+            } catch (JsonProcessingException jsonException) {
+                return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                        .body("{\"success\": false, \"error\": \"Internal error occurred\"}");
+            }
+        }
+    }
+
+    /**
+     * 禁用 HTTP 工具
+     */
+    @PutMapping("/{id}/disable")
+    public ResponseEntity<String> disableHttpTool(@PathVariable int id) {
+        try {
+            Map<String, Object> params = new HashMap<>();
+            params.put("id", id);
+
+            String result = httpApiManagerService.disableHttpApi(params);
+
+            Map<String, Object> resultMap = objectMapper.readValue(result, Map.class);
+            if ((Boolean) resultMap.get("success")) {
+                return ResponseEntity.ok(result);
+            } else {
+                return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(result);
+            }
+        } catch (Exception e) {
+            Map<String, Object> errorResult = new HashMap<>();
+            errorResult.put("success", false);
+            errorResult.put("error", e.getMessage());
+
+            try {
+                return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                        .body(objectMapper.writeValueAsString(errorResult));
+            } catch (JsonProcessingException jsonException) {
+                return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                        .body("{\"success\": false, \"error\": \"Internal error occurred\"}");
+            }
+        }
+    }
+
+    /**
      * 获取所有 HTTP 工具列表
      */
     @GetMapping
